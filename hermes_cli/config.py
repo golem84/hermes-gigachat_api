@@ -5773,6 +5773,7 @@ def set_config_value(key: str, value: str):
         'TERMINAL_SSH_HOST', 'TERMINAL_SSH_USER', 'TERMINAL_SSH_KEY',
         'SUDO_PASSWORD', 'SLACK_BOT_TOKEN', 'SLACK_APP_TOKEN',
         'GITHUB_TOKEN', 'HONCHO_API_KEY',
+        'GIGACHAT_CLIENT_ID', 'GIGACHAT_CLIENT_SECRET', 'GIGACHAT_API_TOKEN',
     ]
     
     if key.upper() in api_keys or key.upper().endswith(('_API_KEY', '_TOKEN')) or key.upper().startswith('TERMINAL_SSH'):
@@ -5869,6 +5870,9 @@ def config_command(args):
             print("  hermes config set model anthropic/claude-sonnet-4")
             print("  hermes config set terminal.backend docker")
             print("  hermes config set OPENROUTER_API_KEY sk-or-...")
+            print("  hermes config set GIGACHAT_API_TOKEN your_base64_token")
+            print("  hermes config set GIGACHAT_CLIENT_ID your_client_id")
+            print("  hermes config set GIGACHAT_CLIENT_SECRET your_secret")
             sys.exit(1)
         set_config_value(key, value)
     

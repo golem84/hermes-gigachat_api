@@ -94,6 +94,41 @@ def _get_gigachat_token() -> str | None:
         return None
 
 
+def _transform_gigachat_response_to_openai(response: dict) -> dict:
+    """Transform GigaChat response to OpenAI-compatible format.
+
+    GigaChat uses legacy function_call format, OpenAI uses modern tool_calls.
+    This function converts the response for Hermes compatibility.
+    """
+    if "choices" not in response:
+        return response
+    
+    for choice in response["choices"]:
+        message = choice.get("message", {})
+        
+        # Convert legacy function_call to modern tool_calls
+        if "function_call" in message:
+            function_call = message["function_call"]
+            
+            # Create modern tool_calls structure
+            tool_call = {
+                "id": f"call_{function_call['name']}",  # Generate call ID
+                "type": "function",
+                "function": {
+                    "name": function_call["name"],
+                    "arguments": json.dumps(function_call.get("arguments", {}))
+                }
+            }
+            
+            message["tool_calls"] = [tool_call]
+            
+            # Keep legacy function_call for potential Hermes handling
+            # but add modern tool_calls for compatibility
+        
+        # Keep all other GigaChat specific fields like functions_state_id
+    return response
+
+
 class GigaChatProfile(ProviderProfile):
     """GigaChat provider profile.
 
@@ -105,11 +140,36 @@ class GigaChatProfile(ProviderProfile):
     def prepare_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Pre-process messages for GigaChat.
 
-        GigaChat expects messages in OpenAI format but may have specific
-        requirements for function calls.
+        GigaChat expects messages in OpenAI format but uses legacy function_call
+        instead of modern tool_calls. Convert between formats as needed.
         """
-        # For now, pass through unchanged - we'll handle function conversion elsewhere
-        return messages
+        processed_messages = []
+        
+        for message in messages:
+            processed_msg = message.copy()
+            
+            # Convert OpenAI tool_calls to GigaChat function_call
+            if "tool_calls" in message:
+                # Convert modern tool_calls to legacy function_call
+                if len(message["tool_calls"]) > 0:
+                    tool_call = message["tool_calls"][0]
+                    if tool_call["type"] == "function":
+                        processed_msg["function_call"] = {
+                            "name": tool_call["function"]["name"],
+                            "arguments": tool_call["function"]["arguments"]
+                        }
+                        # Remove tool_calls for GigaChat compatibility
+                        del processed_msg["tool_calls"]
+            
+            # Convert tool response messages
+            if message.get("role") == "tool":
+                # Convert tool response to function response format
+                processed_msg["role"] = "function"
+                processed_msg["name"] = message.get("tool_call_id", "").split("-")[0]  # Extract function name
+            
+            processed_messages.append(processed_msg)
+        
+        return processed_messages
 
     def build_extra_body(
         self, *, session_id: str | None = None, **context: Any
@@ -127,16 +187,61 @@ class GigaChatProfile(ProviderProfile):
         self,
         *,
         reasoning_config: dict | None = None,
+        tools: list[dict] | None = None,
         **context: Any,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Build API kwargs extras for GigaChat.
 
-        GigaChat doesn't appear to have special reasoning config requirements
-        beyond standard parameters, but we maintain the interface for compatibility.
+        GigaChat uses the legacy `functions` parameter instead of the newer
+        `tools` format. We need to convert OpenAI tools format to GigaChat
+        functions format.
+        
+        GigaChat expects:
+        {
+            "functions": [
+                {
+                    "name": "function_name",
+                    "description": "description",
+                    "parameters": {...}
+                }
+            ]
+        }
+        
+        Instead of OpenAI's modern format:
+        {
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_name",
+                        ...
+                    }
+                }
+            ]
+        }
         """
+        extra_body_additions = {}
+        top_level_kwargs = {}
+        
+        # Convert OpenAI tools to GigaChat functions format
+        if tools:
+            gigachat_functions = []
+            for tool in tools:
+                # Handle both formats
+                if isinstance(tool, dict):
+                    if "type" in tool and tool["type"] == "function" and "function" in tool:
+                        # Modern OpenAI format: {"type": "function", "function": {...}}
+                        gigachat_functions.append(tool["function"])
+                    elif "name" in tool:
+                        # Legacy format or already GigaChat format: {"name": "...", ...}
+                        gigachat_functions.append(tool)
+            
+            if gigachat_functions:
+                extra_body_additions["functions"] = gigachat_functions
+        
         # GigaChat doesn't need special handling for reasoning config
         # beyond what's handled in the standard API call
-        return {}, {}
+        return extra_body_additions, top_level_kwargs
 
     def fetch_models(
         self,

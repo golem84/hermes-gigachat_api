@@ -26,8 +26,6 @@ def _get_gigachat_token() -> str | None:
         Access token string or None if failed.
     """
     # Get credentials from environment variables
-    client_id = os.getenv("GIGACHAT_CLIENT_ID")
-    client_secret = os.getenv("GIGACHAT_CLIENT_SECRET")
     api_token = os.getenv("GIGACHAT_API_TOKEN")
 
     # If we have an API token, check if it's actually the base64 encoded credentials
@@ -38,12 +36,14 @@ def _get_gigachat_token() -> str | None:
             if ":" in decoded:
                 # It appears to be the base64 encoded client_id:client_secret
                 # Use it to fetch an access token via the NGW endpoint
+                # Use UUID4 for RqUID as per official documentation
+                import uuid
                 url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
                 headers = {
                     "Content-Type": "application/x-www-form-urlencoded",
                     "Accept": "application/json",
                     "Authorization": f"Basic {api_token}",
-                    "RqUID": os.urandom(16).hex(),
+                    "RqUID": str(uuid.uuid4()),
                 }
                 data = b"scope=GIGACHAT_API_PERS"
                 try:
@@ -61,12 +61,16 @@ def _get_gigachat_token() -> str | None:
             # If we cannot decode it as base64, treat it as the direct token
             return api_token
 
-    # If we don't have a usable API token, try the client credentials flow
+    # If we don't have a usable API token, try the client credentials flow from separate env vars
+    client_id = os.getenv("GIGACHAT_CLIENT_ID")
+    client_secret = os.getenv("GIGACHAT_CLIENT_SECRET")
+    
     if not client_id or not client_secret:
         logger.debug("GigaChat credentials not found in environment")
         return None
 
-    # Prepare basic auth
+    # Prepare basic auth with UUID4 authentication
+    import uuid
     credentials = f"{client_id}:{client_secret}"
     encoded_credentials = base64.b64encode(credentials.encode()).decode()
 
@@ -76,7 +80,7 @@ def _get_gigachat_token() -> str | None:
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "application/json",
         "Authorization": f"Basic {encoded_credentials}",
-        "RqUID": os.urandom(16).hex(),
+        "RqUID": str(uuid.uuid4()),  # UUID4 as per official documentation
     }
     data = b"scope=GIGACHAT_API_PERS"
 

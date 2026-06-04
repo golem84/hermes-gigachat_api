@@ -26,7 +26,8 @@ def _get_gigachat_token() -> str | None:
         Access token string or None if failed.
     """
     # Check SSL verification setting (default: False for GigaChat's self-signed cert)
-    _ssl_verify = os.getenv("GIGACHAT_SSL_VERIFY", "false").lower() not in ("1", "true", "yes", "on")
+    # GIGACHAT_SSL_VERIFY=true enables verification (requires CA in trust store)
+    _ssl_verify = os.getenv("GIGACHAT_SSL_VERIFY", "false").lower() in ("1", "true", "yes", "on")
     
     # Get credentials from environment variables
     api_token = os.getenv("GIGACHAT_API_TOKEN")

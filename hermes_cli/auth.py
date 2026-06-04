@@ -245,6 +245,14 @@ PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
         api_key_env_vars=("GLM_API_KEY", "ZAI_API_KEY", "Z_AI_API_KEY"),
         base_url_env_var="GLM_BASE_URL",
     ),
+    "gigachat": ProviderConfig(
+        id="gigachat",
+        name="GigaChat (Sberbank)",
+        auth_type="api_key",
+        inference_base_url="https://gigachat.devices.sberbank.ru/api/v1",
+        api_key_env_vars=("GIGACHAT_API_TOKEN", "GIGACHAT_CLIENT_ID", "GIGACHAT_CLIENT_SECRET"),
+        base_url_env_var="GIGACHAT_BASE_URL",
+    ),
     "kimi-coding": ProviderConfig(
         id="kimi-coding",
         name="Kimi / Moonshot",

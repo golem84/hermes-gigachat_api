@@ -5414,7 +5414,7 @@ def _model_flow_gigachat(config, current_model="", args=None):
 
     Flow:
       1. Prompt for CLIENT_ID and CLIENT_SECRET (or use existing from .env)
-      2. Fetch access token via OAuth
+      2. Validate credentials by fetching access token
       3. Fetch available models from GigaChat API
       4. Prompt user to select a model
       5. Save to ~/.hermes/config.yaml
@@ -5435,9 +5435,51 @@ def _model_flow_gigachat(config, current_model="", args=None):
         save_config,
     )
     from hermes_cli.secret_prompt import masked_secret_prompt
+    import urllib.request
+    import urllib.error
+    import json
+    import base64
+    import ssl
 
     provider_id = "gigachat"
     pconfig = PROVIDER_REGISTRY[provider_id]
+
+    def _test_credentials(client_id: str, client_secret: str) -> tuple[bool, str]:
+        """Test credentials by fetching OAuth token. Returns (success, error_message)."""
+        credentials = f"{client_id}:{client_secret}"
+        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+        
+        url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+            "Authorization": f"Basic {encoded_credentials}",
+            "RqUID": "test-credentials",
+        }
+        data = b"scope=GIGACHAT_API_PERS"
+        
+        try:
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            with urllib.request.urlopen(req, timeout=10, context=ssl_context) as response:
+                result = json.loads(response.read().decode())
+                if "access_token" in result:
+                    return True, ""
+                elif "error" in result:
+                    return False, f"{result.get('error')}: {result.get('error_description', 'no description')}"
+                else:
+                    return False, "Unexpected response format"
+        except urllib.error.HTTPError as e:
+            try:
+                body = json.loads(e.read().decode())
+                return False, f"HTTP {e.code}: {body.get('message', e.reason)}"
+            except:
+                return False, f"HTTP {e.code}: {e.reason}"
+        except Exception as e:
+            return False, str(e)
 
     # Step 1: Check for existing credentials
     existing_client_id = get_env_value("GIGACHAT_CLIENT_ID") or os.getenv("GIGACHAT_CLIENT_ID", "")
@@ -5449,64 +5491,111 @@ def _model_flow_gigachat(config, current_model="", args=None):
         print("Get your Client ID and Client Secret from https://developers.sber.ru/")
         print()
 
-        try:
-            client_id = input(
-                f"Client ID [{existing_client_id[:8]}...]" if existing_client_id else "Client ID: "
-            ).strip()
-            if not client_id:
-                if existing_client_id:
-                    client_id = existing_client_id
-                else:
-                    print("Cancelled.")
-                    return
-        except (KeyboardInterrupt, EOFError):
-            print("\nCancelled.")
-            return
-
-        try:
-            client_secret = masked_secret_prompt(
-                f"Client Secret [{existing_client_secret[:8]}...]" if existing_client_secret else "Client Secret: "
-            ).strip()
-            if not client_secret:
-                if existing_client_secret:
-                    client_secret = existing_client_secret
-                else:
-                    print("Cancelled.")
-                    return
-        except (KeyboardInterrupt, EOFError):
-            print("\nCancelled.")
-            return
-
-        # Save credentials
-        save_env_value("GIGACHAT_CLIENT_ID", client_id)
-        save_env_value("GIGACHAT_CLIENT_SECRET", client_secret)
-        print("Credentials saved.")
-        print()
-    else:
-        print(f"  GigaChat Client ID: {existing_client_id[:8]}... ✓")
-        print(f"  GigaChat Client Secret: {existing_client_secret[:8]}... ✓")
-        try:
-            choice = input("  [K]eep / [R]eplace credentials (default K): ").strip().lower()
-        except (KeyboardInterrupt, EOFError):
-            choice = "k"
-
-        if choice.startswith("r"):
+        while True:
             try:
-                client_id = input("New Client ID: ").strip()
-                client_secret = masked_secret_prompt("New Client Secret: ").strip()
+                client_id = input("Client ID: ").strip()
+                if not client_id:
+                    print("Cancelled.")
+                    return
             except (KeyboardInterrupt, EOFError):
                 print("\nCancelled.")
                 return
 
-            if not client_id or not client_secret:
+            try:
+                client_secret = masked_secret_prompt("Client Secret: ").strip()
+                if not client_secret:
+                    print("Cancelled.")
+                    return
+            except (KeyboardInterrupt, EOFError):
+                print("\nCancelled.")
+                return
+
+            # Test credentials immediately
+            print("Testing credentials...")
+            success, error = _test_credentials(client_id, client_secret)
+            if success:
+                break
+            else:
+                print(f"❌ Authentication failed: {error}")
+                print("Please check your Client ID and Client Secret and try again.")
+                print()
+                try:
+                    retry = input("Try again? [Y/n]: ").strip().lower()
+                except (KeyboardInterrupt, EOFError):
+                    print("Cancelled.")
+                    return
+                if retry not in ("", "y", "yes"):
+                    return
+                print()
+
+        # Save credentials
+        save_env_value("GIGACHAT_CLIENT_ID", client_id)
+        save_env_value("GIGACHAT_CLIENT_SECRET", client_secret)
+        print("✓ Credentials saved.")
+        print()
+    else:
+        # Validate existing credentials
+        print(f"  GigaChat Client ID:     {existing_client_id}")
+        print(f"  GigaChat Client Secret: {existing_client_secret[:8]}...")
+        
+        # Test existing credentials
+        print("  Testing credentials...")
+        success, error = _test_credentials(existing_client_id, existing_client_secret)
+        if not success:
+            print(f"  ❌ Existing credentials invalid: {error}")
+            print()
+            try:
+                choice = input("  [R]eplace credentials / [C]ancel (default R): ").strip().lower()
+            except (KeyboardInterrupt, EOFError):
                 print("Cancelled.")
                 return
+            
+            if choice.startswith("c"):
+                print("Cancelled.")
+                return
+            
+            # Replace credentials
+            while True:
+                try:
+                    client_id = input("New Client ID: ").strip()
+                    if not client_id:
+                        print("Cancelled.")
+                        return
+                except (KeyboardInterrupt, EOFError):
+                    print("\nCancelled.")
+                    return
+
+                try:
+                    client_secret = masked_secret_prompt("New Client Secret: ").strip()
+                    if not client_secret:
+                        print("Cancelled.")
+                        return
+                except (KeyboardInterrupt, EOFError):
+                    print("\nCancelled.")
+                    return
+
+                # Test new credentials
+                print("Testing new credentials...")
+                success, error = _test_credentials(client_id, client_secret)
+                if success:
+                    break
+                else:
+                    print(f"❌ Authentication failed: {error}")
+                    try:
+                        retry = input("Try again? [Y/n]: ").strip().lower()
+                    except (KeyboardInterrupt, EOFError):
+                        print("Cancelled.")
+                        return
+                    if retry not in ("", "y", "yes"):
+                        return
+                    print()
 
             save_env_value("GIGACHAT_CLIENT_ID", client_id)
             save_env_value("GIGACHAT_CLIENT_SECRET", client_secret)
-            print("Credentials updated.")
+            print("✓ Credentials updated.")
             print()
         else:
+            print("  ✓ Credentials valid.")
             print()
 
     # Step 2: Test credentials by fetching token and models

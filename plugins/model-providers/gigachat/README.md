@@ -29,9 +29,46 @@ uv pip install gigachat==0.2.2a1
 2. Создайте приложение в личном кабинете
 3. Получите `Client ID` и `Client Secret` (статические ключи, не меняются)
 
-### 2. Настройка Hermes
+### 2. Настройка через `hermes model` (рекомендуется)
 
-**Режим 1: Прямой API токен (просто, но требует обновления)**
+Запустите интерактивный мастер настройки:
+
+```bash
+hermes model
+```
+
+1. В списке провайдеров выберите `gigachat`
+2. Введите `Client ID` (или нажмите Enter для использования текущего значения)
+3. Введите `Client Secret` (или нажмите Enter для использования текущего значения)
+4. Плагин проверит credentials и загрузит список доступных моделей
+5. Выберите модель из списка (текущая модель отмечается маркером `←`)
+6. Настройка завершена
+
+**Преимущества:**
+- ✅ Интерактивный ввод с маской для секрета
+- ✅ Автоматическая проверка credentials
+- ✅ Загрузка актуального списка моделей из API
+- ✅ Сохранение в `~/.hermes/.env` и `~/.hermes/config.yaml`
+
+### 3. Ручная настройка (альтернатива)
+
+**Режим 1: Client credentials (автономная работа, рекомендуется)**
+
+```bash
+# Через Hermes CLI
+hermes config set GIGACHAT_CLIENT_ID ваш_client_id
+hermes config set GIGACHAT_CLIENT_SECRET ваш_client_secret
+
+# Или через переменные окружения
+export GIGACHAT_CLIENT_ID=ваш_client_id
+export GIGACHAT_CLIENT_SECRET=ваш_client_secret
+```
+
+- ✅ Автономно: плагин автоматически получает новый access token при каждом запросе
+- ✅ Client ID + Client Secret **не меняются** — выдаются один раз при создании приложения
+- 💡 Подходит для постоянной работы, не требует ручного обновления токена
+
+**Режим 2: Прямой API токен (опционально, для разовых сессий)**
 
 ```bash
 # Через Hermes CLI
@@ -45,22 +82,6 @@ export GIGACHAT_API_TOKEN=ваш_access_token
 - ⚠️ Access token действует **30 минут** — после истечения нужно получить новый вручную
 - 💡 Подходит для разовых сессий, тестирования
 
-**Режим 2: Client credentials (автономная работа)**
-
-```bash
-# Через Hermes CLI (рекомендуется для production)
-hermes config set GIGACHAT_CLIENT_ID ваш_client_id
-hermes config set GIGACHAT_CLIENT_SECRET ваш_client_secret
-
-# Или через переменные окружения
-export GIGACHAT_CLIENT_ID=ваш_client_id
-export GIGACHAT_CLIENT_SECRET=ваш_client_secret
-```
-
-- ✅ Автономно: плагин автоматически получает новый access token при каждом запросе
-- ✅ Client ID + Client Secret **не меняются** — выдаются один раз при создании приложения
-- 💡 Подходит для постоянной работы, не требует ручного обновления токена
-
 **Режим 3: Base64-encoded credentials (альтернатива)**
 
 ```bash
@@ -68,10 +89,10 @@ export GIGACHAT_CLIENT_SECRET=ваш_client_secret
 export GIGACHAT_API_TOKEN=base64(client_id:client_secret)
 ```
 
-- Эквивалентно режиму 2, но в одной переменной
+- Эквивалентно режиму 1, но в одной переменной
 - Плагин автоматически распознаёт формат и запускает OAuth flow
 
-### 3. SSL-верификация
+### 4. SSL-верификация
 
 GigaChat использует самоподписанные сертификаты. По умолчанию SSL-верификация отключена.
 

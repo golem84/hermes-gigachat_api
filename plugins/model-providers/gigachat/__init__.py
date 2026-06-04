@@ -297,8 +297,20 @@ class GigaChatProfile(ProviderProfile):
             # Add standard headers
             req.add_header("User-Agent", "hermes-cli")
 
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                data = json.loads(response.read().decode())
+            # GigaChat uses self-signed certificates in their certificate chain.
+            # Disable verification by default (GIGACHAT_SSL_VERIFY=false).
+            # For production, set GIGACHAT_SSL_VERIFY=true and add GigaChat CA to trust store.
+            _ssl_verify = os.getenv("GIGACHAT_SSL_VERIFY", "false").lower() in ("1", "true", "yes", "on")
+            if not _ssl_verify:
+                import ssl
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                with urllib.request.urlopen(req, timeout=timeout, context=ssl_context) as response:
+                    data = json.loads(response.read().decode())
+            else:
+                with urllib.request.urlopen(req, timeout=timeout) as response:
+                    data = json.loads(response.read().decode())
 
             # Extract model IDs from response
             models = []

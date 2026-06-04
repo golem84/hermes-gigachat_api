@@ -1,51 +1,177 @@
-# GigaChat Provider Implementation
+# GigaChat Provider Plugin for Hermes Agent
 
-## Overview
-This implements a GigaChat provider plugin for Hermes Agent that enables:
-- Authentication with Sberbank's GigaChat API
-- Access to GigaChat models (GigaChat, GigaChat-2, GigaChat-Max, etc.)
-- Support for GigaChat's native function calling format
+Интеграция GigaChat API в Hermes Agent с поддержкой function calling.
 
-## Key Implementation Details
+## Официальная документация
 
-### Authentication
-The plugin supports two authentication methods:
-1. Direct API token via `GIGACHAT_API_TOKEN` environment variable
-2. Client credentials flow using `GIGACHAT_CLIENT_ID` and `GIGACHAT_CLIENT_SECRET` to fetch tokens from Sberbank's NGW endpoint
+- **Основная документация**: https://developers.sber.ru/docs/ru/gigachat
+- **API Reference**: https://developers.sber.ru/docs/ru/gigachat/reference
+- **Быстрый старт**: https://developers.sber.ru/docs/ru/gigachat/guides/quickstart
+- **Авторизация и токены**: https://developers.sber.ru/docs/ru/gigachat/guides/auth
+- **Function Calling**: https://developers.sber.ru/docs/ru/gigachat/guides/functions
+- **Ограничения и квоты**: https://developers.sber.ru/docs/ru/gigachat/guides/limits
 
-### Model Discovery
-Implements `fetch_models()` to dynamically retrieve available models from:
-```
-https://gigachat.devices.sberbank.ru/api/v1/models
-```
+## Установка и настройка
 
-### Function Calling Support
-Based on research from `/home/hermes/projects/gigachat/README.md`, GigaChat:
-- Does NOT support OpenAI `tools` format
-- DOES support native `functions` format
-- Returns `function_call` in responses when functions are used
+### 1. Получение учётных данных
 
-The actual translation between OpenAI tools format and GigaChat functions format will need to be handled in the transport layer or agent logic, as the provider profile mainly handles authentication and metadata.
+1. Зарегистрируйтесь на [GigaChat Developer Portal](https://developers.sber.ru/)
+2. Создайте приложение в личном кабинете
+3. Получите `Client ID` и `Client Secret`
 
-## Configuration
-Add to your `.env` file:
-```
-# Option 1: Direct token
-GIGACHAT_API_TOKEN=your_token_here
+### 2. Настройка Hermes
 
-# Option 2: Client credentials (for automatic token refresh)
-GIGACHAT_CLIENT_ID=your_client_id
-GIGACHAT_CLIENT_SECRET=your_client_secret
+```bash
+# Через Hermes CLI (рекомендуется)
+hermes config set GIGACHAT_CLIENT_ID ваш_client_id
+hermes config set GIGACHAT_CLIENT_SECRET ваш_client_secret
+
+# Или через переменные окружения
+export GIGACHAT_CLIENT_ID=ваш_client_id
+export GIGACHAT_CLIENT_SECRET=ваш_client_secret
+
+# Или через pre-computed токен
+export GIGACHAT_API_TOKEN=base64(client_id:client_secret)
 ```
 
-## Testing
-To test the plugin:
-1. Ensure credentials are set in environment
-2. The plugin should appear in the provider list
-3. Model fetching should work
-4. Chat completions should function with supported models
+### 3. SSL-верификация
 
-## Known Limitations
-- The current implementation assumes standard chat completions work
-- Function calling translation layer needs to be implemented separately
-- Streaming support needs to be verified
+GigaChat использует самоподписанные сертификаты. По умолчанию SSL-верификация отключена.
+
+```bash
+# По умолчанию (SSL отключен)
+# Работает сразу после установки
+
+# Для production (требуется добавить CA в trust store)
+export GIGACHAT_SSL_VERIFY=true
+```
+
+## Механизм ротации токенов
+
+### Срок действия токена
+
+**Access token действует 30 минут** (согласно официальной документации).
+
+### Автоматическая ротация
+
+Плагин автоматически получает новый токен при каждом запросе к API:
+
+1. **При инициализации клиента**: `_get_gigachat_token()` вызывается для получения свежего токена
+2. **При 401 ошибке**: Hermes credential pool автоматически ротирует токен
+3. **Кэширование**: Токен не кэшируется намеренно — каждый запрос получает свежий токен
+
+### Почему не кэшируем?
+
+- Простота реализации
+- Избегаем edge cases с истёкшими токенами
+- OAuth-запрос быстрый (~200-500ms)
+- GigaChat не имеет rate limits на OAuth endpoint
+
+### Схема работы
+
+```
+Hermes Agent запрос
+    ↓
+_get_gigachat_token()
+    ↓
+POST https://ngw.devices.sberbank.ru:9443/api/v2/oauth
+    ↓
+Получение access_token (30 мин)
+    ↓
+Использование в API запросе
+    ↓
+GigaChat API ответ
+```
+
+## Поддерживаемые модели
+
+- `GigaChat` — базовая модель
+- `GigaChat-2` — второе поколение
+- `GigaChat-2-Max` — максимальная производительность
+- `GigaChat-2-Pro` — продвинутая версия
+- `GigaChat-Max` — флагманская модель
+- `GigaChat-Plus` — сбалансированная
+- `GigaChat-Pro` — профессиональная
+
+## Function Calling
+
+GigaChat использует **нативный `functions` формат**, а не OpenAI `tools`.
+
+### Преобразование форматов
+
+Плагин автоматически преобразует:
+
+| Hermes (OpenAI) | GigaChat (Native) |
+|-----------------|-------------------|
+| `tools[]` | `functions[]` |
+| `tool_calls[]` | `function_call` |
+| `tool.role: "tool"` | `function.role: "function"` |
+
+### Пример function call
+
+```json
+{
+  "model": "GigaChat-Max",
+  "messages": [{"role": "user", "content": "Погода в Москве"}],
+  "functions": [{
+    "name": "get_weather",
+    "description": "Получить погоду",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "location": {"type": "string"}
+      },
+      "required": ["location"]
+    }
+  }]
+}
+```
+
+## API Endpoints
+
+| Endpoint | Назначение | SSL |
+|----------|------------|-----|
+| `https://ngw.devices.sberbank.ru:9443/api/v2/oauth` | OAuth токен | Self-signed |
+| `https://gigachat.devices.sberbank.ru/api/v1/models` | Список моделей | Self-signed |
+| `https://gigachat.devices.sberbank.ru/api/v1/chat/completions` | Chat API | Self-signed |
+| `https://gigachat.devices.sberbank.ru/api/v1/embeddings` | Embeddings | Self-signed |
+
+## Переменные окружения
+
+| Переменная | Описание | По умолчанию |
+|------------|----------|--------------|
+| `GIGACHAT_API_TOKEN` | Pre-computed токен (base64) | - |
+| `GIGACHAT_CLIENT_ID` | Client ID из кабинета | - |
+| `GIGACHAT_CLIENT_SECRET` | Client Secret | - |
+| `GIGACHAT_SSL_VERIFY` | Включить SSL-верификацию | `false` |
+| `GIGACHAT_BASE_URL` | Кастомный base URL | `https://gigachat.devices.sberbank.ru/api/v1` |
+
+## Troubleshooting
+
+### 401 Unauthorized
+
+- Проверьте правильность `CLIENT_ID` и `CLIENT_SECRET`
+- Убедитесь, что приложение активно в личном кабинете
+- Проверьте квоты и лимиты
+
+### Connection error
+
+- SSL-сертификаты: установите `GIGACHAT_SSL_VERIFY=false`
+- Проверьте доступность endpoints из вашей сети
+- Возможно нужен прокси
+
+### Function calling не работает
+
+- Убедитесь, что модель поддерживает functions (Max, Pro)
+- Используйте правильный формат `functions` (не `tools`)
+- Проверьте `finish_reason: "function_call"` в ответе
+
+## Ссылки
+
+- [GigaChat API Docs](https://developers.sber.ru/docs/ru/gigachat)
+- [ai-forever/gigachat](https://github.com/ai-forever/gigachat) — Python SDK
+- [Hermes Agent Docs](https://hermes-agent.nousresearch.com/docs)
+
+## Лицензия
+
+MIT

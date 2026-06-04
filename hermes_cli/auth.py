@@ -7289,6 +7289,8 @@ def resolve_gigachat_runtime_credentials() -> Dict[str, Any]:
     GigaChat requires OAuth token fetched via _get_gigachat_token() from the plugin.
     Token expires after 30 minutes, so we fetch fresh token on each call.
     """
+    from hermes_cli.config import get_env_value
+    
     # Import the token fetcher from the plugin
     try:
         from plugins.model_providers.gigachat import _get_gigachat_token
@@ -7299,18 +7301,30 @@ def resolve_gigachat_runtime_credentials() -> Dict[str, Any]:
             code="plugin_not_found",
         )
 
+    # Read credentials from .env file (not just process environment)
+    client_id = get_env_value("GIGACHAT_CLIENT_ID") or os.getenv("GIGACHAT_CLIENT_ID", "")
+    client_secret = get_env_value("GIGACHAT_CLIENT_SECRET") or os.getenv("GIGACHAT_CLIENT_SECRET", "")
+    api_token = get_env_value("GIGACHAT_API_TOKEN") or os.getenv("GIGACHAT_API_TOKEN", "")
+    
+    # Set in os.environ for the plugin to read
+    if client_id:
+        os.environ["GIGACHAT_CLIENT_ID"] = client_id
+    if client_secret:
+        os.environ["GIGACHAT_CLIENT_SECRET"] = client_secret
+    if api_token:
+        os.environ["GIGACHAT_API_TOKEN"] = api_token
+
     access_token = _get_gigachat_token()
     if not access_token:
         raise AuthError(
-            "Failed to fetch GigaChat access token. Check GIGACHAT_CLIENT_ID and GIGACHAT_CLIENT_SECRET.",
+            "Failed to fetch GigaChat access token. Check GIGACHAT_CLIENT_ID and GIGACHAT_CLIENT_SECRET. Run `hermes model` to re-authenticate.",
             provider="gigachat",
             code="token_fetch_failed",
             relogin_required=True,
         )
 
     base_url = (
-        os.getenv("GIGACHAT_BASE_URL", "").strip().rstrip("/")
-        or "https://gigachat.devices.sberbank.ru/api/v1"
+        get_env_value("GIGACHAT_BASE_URL") or os.getenv("GIGACHAT_BASE_URL", "") or "https://gigachat.devices.sberbank.ru/api/v1"
     )
 
     return {

@@ -3896,6 +3896,25 @@ def resolve_provider_client(
             return resolve_provider_client("openai-codex", model, async_mode)
         if provider == "xai-oauth":
             return resolve_provider_client("xai-oauth", model, async_mode)
+        if provider == "gigachat":
+            # GigaChat OAuth: fetch token from plugin and create OpenAI client
+            try:
+                from hermes_cli.auth import resolve_gigachat_runtime_credentials
+                creds = resolve_gigachat_runtime_credentials()
+                api_key = creds.get("api_key", "")
+                base_url = creds.get("base_url", "").rstrip("/")
+                if api_key and base_url:
+                    from openai import OpenAI
+                    client = OpenAI(
+                        api_key=api_key,
+                        base_url=base_url,
+                    )
+                    final_model = _normalize_resolved_model(model or "GigaChat-Max", provider)
+                    logger.debug("resolve_provider_client: gigachat (%s)", final_model)
+                    return (_to_async_client(client, final_model, is_vision=is_vision) if async_mode
+                            else (client, final_model))
+            except Exception as exc:
+                logger.debug("resolve_provider_client: gigachat OAuth failed: %s", exc)
         # Other OAuth providers not directly supported
         logger.warning("resolve_provider_client: OAuth provider %s not "
                        "directly supported, try 'auto'", provider)

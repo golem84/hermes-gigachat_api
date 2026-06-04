@@ -337,7 +337,7 @@ gigachat = GigaChatProfile(
     api_mode="chat_completions",  # Uses standard chat completions endpoint
     env_vars=("GIGACHAT_API_TOKEN", "GIGACHAT_CLIENT_ID", "GIGACHAT_CLIENT_SECRET"),
     base_url="https://gigachat.devices.sberbank.ru/api/v1",
-    auth_type="api_key",  # Will use Bearer token
+    auth_type="oauth_external",  # OAuth token fetched via _get_gigachat_token()
     # Note: We don't set default_aux_model as GigaChat models are all fairly capable
     # SSL verification: GigaChat uses self-signed certs. Set GIGACHAT_SSL_VERIFY=true for production.
 )

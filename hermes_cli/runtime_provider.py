@@ -25,6 +25,7 @@ from hermes_cli.auth import (
     resolve_xai_oauth_runtime_credentials,
     resolve_qwen_runtime_credentials,
     resolve_gemini_oauth_runtime_credentials,
+    resolve_gigachat_runtime_credentials,
     resolve_api_key_provider_credentials,
     resolve_external_process_provider_credentials,
     has_usable_secret,
@@ -324,6 +325,10 @@ def _resolve_runtime_from_pool_entry(
         # prior OpenAI-compatible provider, or the client will hit
         # /chat/completions under /anthropic and receive a bare nginx 404.
         api_mode = "anthropic_messages"
+        pconfig = PROVIDER_REGISTRY.get(provider)
+        base_url = base_url or (pconfig.inference_base_url if pconfig else "")
+    elif provider == "gigachat":
+        api_mode = "chat_completions"
         pconfig = PROVIDER_REGISTRY.get(provider)
         base_url = base_url or (pconfig.inference_base_url if pconfig else "")
     elif provider == "anthropic":
@@ -1398,6 +1403,23 @@ def resolve_runtime_provider(
             if requested_provider != "auto":
                 raise
             logger.info("Auto-detected xAI OAuth provider but credentials failed; "
+                        "falling through to next provider.")
+
+    if provider == "gigachat":
+        try:
+            creds = resolve_gigachat_runtime_credentials()
+            return {
+                "provider": "gigachat",
+                "api_mode": "chat_completions",
+                "base_url": (creds.get("base_url") or "").rstrip("/"),
+                "api_key": creds.get("api_key", ""),
+                "source": creds.get("source", "oauth_token_fetch"),
+                "requested_provider": requested_provider,
+            }
+        except AuthError:
+            if requested_provider != "auto":
+                raise
+            logger.info("GigaChat OAuth credentials failed; "
                         "falling through to next provider.")
 
     if provider == "qwen-oauth":

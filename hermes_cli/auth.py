@@ -248,7 +248,7 @@ PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
     "gigachat": ProviderConfig(
         id="gigachat",
         name="GigaChat (Sberbank)",
-        auth_type="api_key",
+        auth_type="oauth_external",
         inference_base_url="https://gigachat.devices.sberbank.ru/api/v1",
         api_key_env_vars=("GIGACHAT_API_TOKEN", "GIGACHAT_CLIENT_ID", "GIGACHAT_CLIENT_SECRET"),
         base_url_env_var="GIGACHAT_BASE_URL",
@@ -7280,6 +7280,45 @@ def resolve_minimax_oauth_runtime_credentials(
         "api_key": api_key,
         "base_url": state["inference_base_url"].rstrip("/"),
         "source": "oauth",
+    }
+
+
+def resolve_gigachat_runtime_credentials() -> Dict[str, Any]:
+    """Resolve runtime credentials for GigaChat OAuth.
+
+    GigaChat requires OAuth token fetched via _get_gigachat_token() from the plugin.
+    Token expires after 30 minutes, so we fetch fresh token on each call.
+    """
+    # Import the token fetcher from the plugin
+    try:
+        from plugins.model_providers.gigachat import _get_gigachat_token
+    except ImportError:
+        raise AuthError(
+            "GigaChat plugin not found. Ensure plugins/model-providers/gigachat/__init__.py exists.",
+            provider="gigachat",
+            code="plugin_not_found",
+        )
+
+    access_token = _get_gigachat_token()
+    if not access_token:
+        raise AuthError(
+            "Failed to fetch GigaChat access token. Check GIGACHAT_CLIENT_ID and GIGACHAT_CLIENT_SECRET.",
+            provider="gigachat",
+            code="token_fetch_failed",
+            relogin_required=True,
+        )
+
+    base_url = (
+        os.getenv("GIGACHAT_BASE_URL", "").strip().rstrip("/")
+        or "https://gigachat.devices.sberbank.ru/api/v1"
+    )
+
+    return {
+        "provider": "gigachat",
+        "base_url": base_url,
+        "api_key": access_token,
+        "source": "oauth_token_fetch",
+        "auth_mode": "oauth_client_credentials",
     }
 
 

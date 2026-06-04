@@ -2697,6 +2697,8 @@ def select_provider_and_model(args=None):
         _model_flow_bedrock(config, current_model)
     elif selected_provider == "azure-foundry":
         _model_flow_azure_foundry(config, current_model)
+    elif selected_provider == "gigachat":
+        _model_flow_gigachat(config, current_model, args=args)
     elif selected_provider in {
         "openai-api",
         "gemini",
@@ -5403,6 +5405,145 @@ def _model_flow_kimi(config, current_model=""):
 
         endpoint_label = "Kimi Coding" if is_coding_plan else "Moonshot"
         print(f"Default model set to: {selected} (via {endpoint_label})")
+    else:
+        print("No change.")
+
+
+def _model_flow_gigachat(config, current_model="", args=None):
+    """GigaChat model selection with OAuth credentials flow.
+
+    Flow:
+      1. Prompt for CLIENT_ID and CLIENT_SECRET (or use existing from .env)
+      2. Fetch access token via OAuth
+      3. Fetch available models from GigaChat API
+      4. Prompt user to select a model
+      5. Save to ~/.hermes/config.yaml
+    """
+    from hermes_cli.auth import (
+        PROVIDER_REGISTRY,
+        _prompt_model_selection,
+        _save_model_choice,
+        _update_config_for_provider,
+        resolve_gigachat_runtime_credentials,
+        AuthError,
+        format_auth_error,
+    )
+    from hermes_cli.config import (
+        get_env_value,
+        save_env_value,
+        load_config,
+        save_config,
+    )
+    from hermes_cli.secret_prompt import masked_secret_prompt
+
+    provider_id = "gigachat"
+    pconfig = PROVIDER_REGISTRY[provider_id]
+
+    # Step 1: Check for existing credentials
+    existing_client_id = get_env_value("GIGACHAT_CLIENT_ID") or os.getenv("GIGACHAT_CLIENT_ID", "")
+    existing_client_secret = get_env_value("GIGACHAT_CLIENT_SECRET") or os.getenv("GIGACHAT_CLIENT_SECRET", "")
+
+    # If no credentials exist, prompt for them
+    if not existing_client_id or not existing_client_secret:
+        print("GigaChat OAuth credentials required.")
+        print("Get your Client ID and Client Secret from https://developers.sber.ru/")
+        print()
+
+        try:
+            client_id = input(
+                f"Client ID [{existing_client_id[:8]}...]" if existing_client_id else "Client ID: "
+            ).strip()
+            if not client_id:
+                if existing_client_id:
+                    client_id = existing_client_id
+                else:
+                    print("Cancelled.")
+                    return
+        except (KeyboardInterrupt, EOFError):
+            print("\nCancelled.")
+            return
+
+        try:
+            client_secret = masked_secret_prompt(
+                f"Client Secret [{existing_client_secret[:8]}...]" if existing_client_secret else "Client Secret: "
+            ).strip()
+            if not client_secret:
+                if existing_client_secret:
+                    client_secret = existing_client_secret
+                else:
+                    print("Cancelled.")
+                    return
+        except (KeyboardInterrupt, EOFError):
+            print("\nCancelled.")
+            return
+
+        # Save credentials
+        save_env_value("GIGACHAT_CLIENT_ID", client_id)
+        save_env_value("GIGACHAT_CLIENT_SECRET", client_secret)
+        print("Credentials saved.")
+        print()
+    else:
+        print(f"  GigaChat Client ID: {existing_client_id[:8]}... ✓")
+        print(f"  GigaChat Client Secret: {existing_client_secret[:8]}... ✓")
+        try:
+            choice = input("  [K]eep / [R]eplace credentials (default K): ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            choice = "k"
+
+        if choice.startswith("r"):
+            try:
+                client_id = input("New Client ID: ").strip()
+                client_secret = masked_secret_prompt("New Client Secret: ").strip()
+            except (KeyboardInterrupt, EOFError):
+                print("\nCancelled.")
+                return
+
+            if not client_id or not client_secret:
+                print("Cancelled.")
+                return
+
+            save_env_value("GIGACHAT_CLIENT_ID", client_id)
+            save_env_value("GIGACHAT_CLIENT_SECRET", client_secret)
+            print("Credentials updated.")
+            print()
+        else:
+            print()
+
+    # Step 2: Test credentials by fetching token and models
+    print("Testing credentials and fetching available models...")
+    try:
+        creds = resolve_gigachat_runtime_credentials()
+    except AuthError as exc:
+        print(format_auth_error(exc))
+        print()
+        print("Please check your Client ID and Client Secret and re-run `hermes model`.")
+        return
+
+    # Step 3: Fetch models from GigaChat API
+    from hermes_cli.models import _PROVIDER_MODELS
+    model_ids = list(_PROVIDER_MODELS.get("gigachat", []))
+
+    if not model_ids:
+        print("  Could not fetch model list from GigaChat API.")
+        print("  Continuing with manual model entry...")
+        print()
+    else:
+        print(f"  Found {len(model_ids)} available model(s).")
+        print()
+
+    # Step 4: Model selection
+    if model_ids:
+        selected = _prompt_model_selection(model_ids, current_model=current_model)
+    else:
+        try:
+            selected = input("Enter model name (e.g., GigaChat-Pro): ").strip()
+        except (KeyboardInterrupt, EOFError):
+            selected = None
+
+    if selected:
+        _save_model_choice(selected)
+        _update_config_for_provider(provider_id, creds["base_url"])
+        print(f"✓ Using GigaChat model: {selected}")
     else:
         print("No change.")
 

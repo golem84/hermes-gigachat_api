@@ -55,19 +55,31 @@ Expected models:
 ## 🔧 Configuration Options
 
 ### SSL Verification (Production Security)
-The plugin currently disables SSL verification for testing. For production:
+GigaChat uses self-signed certificates in their certificate chain. By default, SSL verification is disabled to allow immediate testing.
 
-**Temporary Setting:**
-```python
-# In plugin __init__.py, verify=False → verify=True
+**Default (Development):**
+```bash
+# SSL verification disabled by default for GigaChat
+# This allows connection despite self-signed certificates
 ```
 
-**Permanent Solution:**
-Add GigaChat's SSL certificate to your system trust store:
+**Production (Recommended):**
+For production use, add GigaChat's CA certificate to your system trust store:
 ```bash
 # Download GigaChat certificates and add to OS trust store
 sudo cp gigachat_certs/*.crt /usr/local/share/ca-certificates/
 sudo update-ca-certificates
+# Then enable verification
+export GIGACHAT_SSL_VERIFY=true
+```
+
+**Temporary Override:**
+```bash
+# Force SSL verification (will fail without proper CA certs)
+export GIGACHAT_SSL_VERIFY=true
+
+# Explicitly disable (default behavior)
+export GIGACHAT_SSL_VERIFY=false
 ```
 
 ### Token Refresh Strategy
@@ -106,9 +118,10 @@ hermes-agent/plugins/model-providers/__init__.py
 3. Confirm network connectivity to GigaChat endpoints
 
 ### SSL Certificate Errors
-- Development: Plugin automatically disables verification
-- Production: Add GigaChat certificates to system trust store
-- Temporary: Set `SSL_VERIFY=false` in your environment
+- **Default behavior**: SSL verification is disabled by default for GigaChat (`GIGACHAT_SSL_VERIFY=false`)
+- **Connection errors**: If you still see SSL errors, ensure `GIGACHAT_SSL_VERIFY=false` is set
+- **Production**: Set `GIGACHAT_SSL_VERIFY=true` only after adding GigaChat CA to your system trust store
+- **Temporary test**: `export GIGACHAT_SSL_VERIFY=false` to explicitly disable verification
 
 ### Model Not Available
 1. Run `hermes models list --provider gigachat` to see available models

@@ -2967,9 +2967,16 @@ class AIAgent:
             # Explicitly read proxy settings while still honoring NO_PROXY for
             # loopback / local endpoints such as a locally hosted sub2api.
             _proxy = _get_proxy_for_base_url(base_url)
+            
+            # GigaChat uses self-signed certificates; disable verification when configured
+            _verify = True
+            if base_url and "gigachat.devices.sberbank.ru" in base_url:
+                _verify = os.getenv("GIGACHAT_SSL_VERIFY", "false").lower() not in ("1", "true", "yes", "on")
+            
             return _httpx.Client(
                 transport=_httpx.HTTPTransport(socket_options=_sock_opts),
                 proxy=_proxy,
+                verify=_verify,
             )
         except Exception:
             return None

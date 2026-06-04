@@ -25,6 +25,9 @@ def _get_gigachat_token() -> str | None:
     Returns:
         Access token string or None if failed.
     """
+    # Check SSL verification setting (default: False for GigaChat's self-signed cert)
+    _ssl_verify = os.getenv("GIGACHAT_SSL_VERIFY", "false").lower() not in ("1", "true", "yes", "on")
+    
     # Get credentials from environment variables
     api_token = os.getenv("GIGACHAT_API_TOKEN")
 
@@ -48,9 +51,19 @@ def _get_gigachat_token() -> str | None:
                 data = b"scope=GIGACHAT_API_PERS"
                 try:
                     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-                    with urllib.request.urlopen(req, timeout=10) as response:
-                        result = json.loads(response.read().decode())
-                        return result.get("access_token")
+                    # Create SSL context based on GIGACHAT_SSL_VERIFY setting
+                    if not _ssl_verify:
+                        import ssl
+                        ssl_context = ssl.create_default_context()
+                        ssl_context.check_hostname = False
+                        ssl_context.verify_mode = ssl.CERT_NONE
+                        with urllib.request.urlopen(req, timeout=10, context=ssl_context) as response:
+                            result = json.loads(response.read().decode())
+                            return result.get("access_token")
+                    else:
+                        with urllib.request.urlopen(req, timeout=10) as response:
+                            result = json.loads(response.read().decode())
+                            return result.get("access_token")
                 except Exception as e:
                     logger.debug("Failed to fetch GigaChat token from base64 credentials: %s", e)
                     # Fall through to try the client credentials flow below
@@ -86,9 +99,22 @@ def _get_gigachat_token() -> str | None:
 
     try:
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=10) as response:
-            result = json.loads(response.read().decode())
-            return result.get("access_token")
+        # Create SSL context based on GIGACHAT_SSL_VERIFY setting
+        # GigaChat uses self-signed certificates in their certificate chain,
+        # so verification is disabled by default (GIGACHAT_SSL_VERIFY=false).
+        # For production, set GIGACHAT_SSL_VERIFY=true and add GigaChat CA to trust store.
+        if not _ssl_verify:
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=10, context=ssl_context) as response:
+                result = json.loads(response.read().decode())
+                return result.get("access_token")
+        else:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                result = json.loads(response.read().decode())
+                return result.get("access_token")
     except Exception as e:
         logger.debug("Failed to fetch GigaChat token: %s", e)
         return None
@@ -300,6 +326,7 @@ gigachat = GigaChatProfile(
     base_url="https://gigachat.devices.sberbank.ru/api/v1",
     auth_type="api_key",  # Will use Bearer token
     # Note: We don't set default_aux_model as GigaChat models are all fairly capable
+    # SSL verification: GigaChat uses self-signed certs. Set GIGACHAT_SSL_VERIFY=true for production.
 )
 
 # Register the provider

@@ -3915,6 +3915,7 @@ def resolve_provider_client(
                             else (client, final_model))
             except Exception as exc:
                 logger.debug("resolve_provider_client: gigachat OAuth failed: %s", exc)
+                return None, None
         # Other OAuth providers not directly supported
         logger.warning("resolve_provider_client: OAuth provider %s not "
                        "directly supported, try 'auto'", provider)

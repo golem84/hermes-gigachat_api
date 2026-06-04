@@ -945,6 +945,7 @@ CANONICAL_PROVIDERS: list[ProviderEntry] = [
     ProviderEntry("bedrock",        "AWS Bedrock",              "AWS Bedrock (Claude, Nova, Llama, DeepSeek; IAM or API key)"),
     ProviderEntry("azure-foundry",  "Azure Foundry",            "Azure Foundry (OpenAI-style or Anthropic-style endpoint, your Azure AI deployment)"),
     ProviderEntry("qwen-oauth",     "Qwen OAuth (Portal)",      "Qwen OAuth (Reuses local Qwen CLI login)"),
+    ProviderEntry("gigachat",       "GigaChat (Sber direct API)", "GigaChat (Sberbank direct API with OAuth credentials)"),
 ]
 
 # Auto-extend CANONICAL_PROVIDERS with any provider registered in providers/

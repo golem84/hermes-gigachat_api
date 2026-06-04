@@ -1,0 +1,33 @@
+from 'hermes model' output:
+  Choice [default 20]: 28
+
+  GigaChat Client ID: bc0ad15d... ✓
+  GigaChat Client Secret: a0530e75... ✓
+  [K]eep / [R]eplace credentials (default K):
+
+Testing credentials and fetching available models...
+Failed to fetch GigaChat access token. Check GIGACHAT_CLIENT_ID and GIGACHAT_CLIENT_SECRET. Run `hermes model` to re-authenticate.
+-----
+from 'hermes logs' output:
+2026-06-04 15:48:25,257 WARNING agent.auxiliary_client: Auxiliary Nous client unavailable: no Nous authentication found (run: hermes auth).
+2026-06-04 15:48:25,273 WARNING agent.auxiliary_client: Auxiliary: marking nous unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:25.
+2026-06-04 15:48:25,841 WARNING agent.auxiliary_client: resolve_provider_client: OAuth provider gigachat not directly supported, try 'auto'
+2026-06-04 15:48:25,872 WARNING agent.auxiliary_client: Auxiliary: marking openrouter unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:25.
+2026-06-04 15:48:25,891 WARNING agent.auxiliary_client: Auxiliary Nous client unavailable: no Nous authentication found (run: hermes auth).
+2026-06-04 15:48:25,891 WARNING agent.auxiliary_client: Auxiliary: marking nous unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:25.
+2026-06-04 15:48:28,089 WARNING agent.auxiliary_client: resolve_provider_client: OAuth provider gigachat not directly supported, try 'auto'
+2026-06-04 15:48:28,107 WARNING agent.auxiliary_client: Auxiliary: marking openrouter unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:28.
+2026-06-04 15:48:28,131 WARNING agent.auxiliary_client: Auxiliary Nous client unavailable: no Nous authentication found (run: hermes auth).
+2026-06-04 15:48:28,131 WARNING agent.auxiliary_client: Auxiliary: marking nous unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:28.
+2026-06-04 15:48:28,723 WARNING agent.auxiliary_client: resolve_provider_client: OAuth provider gigachat not directly supported, try 'auto'
+2026-06-04 15:48:28,740 WARNING agent.auxiliary_client: Auxiliary: marking openrouter unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:28.
+2026-06-04 15:48:28,772 WARNING agent.auxiliary_client: Auxiliary Nous client unavailable: no Nous authentication found (run: hermes auth).
+2026-06-04 15:48:28,772 WARNING agent.auxiliary_client: Auxiliary: marking nous unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:28.
+2026-06-04 15:48:29,372 WARNING agent.auxiliary_client: resolve_provider_client: OAuth provider gigachat not directly supported, try 'auto'
+2026-06-04 15:48:29,400 WARNING agent.auxiliary_client: Auxiliary: marking openrouter unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:29.
+2026-06-04 15:48:29,416 WARNING agent.auxiliary_client: Auxiliary Nous client unavailable: no Nous authentication found (run: hermes auth).
+2026-06-04 15:48:29,416 WARNING agent.auxiliary_client: Auxiliary: marking nous unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:29.
+2026-06-04 15:48:29,991 WARNING agent.auxiliary_client: resolve_provider_client: OAuth provider gigachat not directly supported, try 'auto'
+2026-06-04 15:48:30,023 WARNING agent.auxiliary_client: Auxiliary: marking openrouter unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:30.
+2026-06-04 15:48:30,052 WARNING agent.auxiliary_client: Auxiliary Nous client unavailable: no Nous authentication found (run: hermes auth).
+2026-06-04 15:48:30,052 WARNING agent.auxiliary_client: Auxiliary: marking nous unhealthy for 60s (payment / credit error). Subsequent auxiliary calls will skip it until 15:49:30.

@@ -351,6 +351,14 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "trinity-large-preview",
         "trinity-mini",
     ],
+    "gigachat": [
+        "GigaChat-Max",
+        "GigaChat-Plus",
+        "GigaChat-Pro",
+        "GigaChat-Max-Turbo",
+        "GigaChat-Plus-0920",
+        "GigaChat-Max-0920",
+    ],
     "gmi": [
         "zai-org/GLM-5.1-FP8",
         "deepseek-ai/DeepSeek-V3.2",

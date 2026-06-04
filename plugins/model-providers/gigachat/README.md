@@ -18,11 +18,7 @@
 Для расширенных функций (embeddings, vision, файлы) установите официальный Python SDK:
 
 ```bash
-# Виртуальное окружение Hermes
 uv pip install gigachat==0.2.2a1
-
-# Или через extra при установке Hermes
-pip install hermes-agent[gigachat]
 ```
 
 **Примечание:** Базовый чат и function calling работают без этой зависимости — плагин использует прямой HTTP API.

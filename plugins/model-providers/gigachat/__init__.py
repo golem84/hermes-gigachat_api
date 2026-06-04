@@ -20,7 +20,17 @@ logger = __import__("logging").getLogger(__name__)
 
 
 def _get_gigachat_token() -> str | None:
-    """Fetch GigaChat access token using client credentials from environment.
+    """Fetch GigaChat access token.
+
+    Supports two modes:
+    1. Direct API token (GIGACHAT_API_TOKEN) — user-provided access token from developer portal
+    2. Client credentials (GIGACHAT_CLIENT_ID + GIGACHAT_CLIENT_SECRET) — auto-fetch access token via OAuth
+
+    Priority:
+    - If GIGACHAT_API_TOKEN is set and NOT base64-encoded credentials: use it directly
+    - If GIGACHAT_API_TOKEN is base64-encoded (client_id:client_secret): fetch access token via OAuth
+    - If GIGACHAT_CLIENT_ID + GIGACHAT_CLIENT_SECRET are set: fetch access token via OAuth
+    - Otherwise: return None
 
     Returns:
         Access token string or None if failed.
@@ -32,63 +42,57 @@ def _get_gigachat_token() -> str | None:
     # Get credentials from environment variables
     api_token = os.getenv("GIGACHAT_API_TOKEN")
 
-    # If we have an API token, check if it's actually the base64 encoded credentials
+    # Mode 1: Direct API token (not base64-encoded credentials)
+    # This is a pre-computed access token from the developer portal
+    # Token expires after 30 minutes — user must refresh manually or use credentials mode
     if api_token:
         # Try to decode the token as base64 and see if it contains a colon (i.e., it's client_id:client_secret)
         try:
             decoded = base64.b64decode(api_token).decode("utf-8")
             if ":" in decoded:
                 # It appears to be the base64 encoded client_id:client_secret
-                # Use it to fetch an access token via the NGW endpoint
-                # Use UUID4 for RqUID as per official documentation
-                import uuid
-                url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
-                headers = {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Accept": "application/json",
-                    "Authorization": f"Basic {api_token}",
-                    "RqUID": str(uuid.uuid4()),
-                }
-                data = b"scope=GIGACHAT_API_PERS"
-                try:
-                    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-                    # Create SSL context based on GIGACHAT_SSL_VERIFY setting
-                    if not _ssl_verify:
-                        import ssl
-                        ssl_context = ssl.create_default_context()
-                        ssl_context.check_hostname = False
-                        ssl_context.verify_mode = ssl.CERT_NONE
-                        with urllib.request.urlopen(req, timeout=10, context=ssl_context) as response:
-                            result = json.loads(response.read().decode())
-                            return result.get("access_token")
-                    else:
-                        with urllib.request.urlopen(req, timeout=10) as response:
-                            result = json.loads(response.read().decode())
-                            return result.get("access_token")
-                except Exception as e:
-                    logger.debug("Failed to fetch GigaChat token from base64 credentials: %s", e)
-                    # Fall through to try the client credentials flow below
+                # Use it to fetch an access token via the NGW endpoint (Mode 2a)
+                return _fetch_token_oauth(api_token, _ssl_verify, "base64_credentials")
             else:
-                # The token is not base64 encoded credentials, treat it as the direct token
+                # The token is not base64 encoded credentials, treat it as the direct access token (Mode 1)
+                logger.debug("Using direct API token (GIGACHAT_API_TOKEN)")
                 return api_token
         except Exception:
-            # If we cannot decode it as base64, treat it as the direct token
+            # If we cannot decode it as base64, treat it as the direct access token (Mode 1)
+            logger.debug("Using direct API token (non-base64 GIGACHAT_API_TOKEN)")
             return api_token
 
-    # If we don't have a usable API token, try the client credentials flow from separate env vars
+    # Mode 2a: Client credentials from GIGACHAT_API_TOKEN as base64(client_id:client_secret)
+    # Already handled above via _fetch_token_oauth
+
+    # Mode 2b: Client credentials from separate env vars (GIGACHAT_CLIENT_ID + GIGACHAT_CLIENT_SECRET)
+    # This mode auto-fetches access token via OAuth — no manual refresh needed
     client_id = os.getenv("GIGACHAT_CLIENT_ID")
     client_secret = os.getenv("GIGACHAT_CLIENT_SECRET")
     
-    if not client_id or not client_secret:
-        logger.debug("GigaChat credentials not found in environment")
-        return None
+    if client_id and client_secret:
+        logger.debug("Using client credentials (GIGACHAT_CLIENT_ID + GIGACHAT_CLIENT_SECRET)")
+        credentials = f"{client_id}:{client_secret}"
+        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+        return _fetch_token_oauth(encoded_credentials, _ssl_verify, "client_credentials")
+    
+    logger.debug("GigaChat credentials not found in environment")
+    return None
 
-    # Prepare basic auth with UUID4 authentication
+
+def _fetch_token_oauth(encoded_credentials: str, ssl_verify: bool, mode: str) -> str | None:
+    """Fetch access token via OAuth client credentials flow.
+
+    Args:
+        encoded_credentials: Base64-encoded client_id:client_secret
+        ssl_verify: Whether to verify SSL certificates
+        mode: "base64_credentials" or "client_credentials" for logging
+
+    Returns:
+        Access token string or None if failed.
+    """
     import uuid
-    credentials = f"{client_id}:{client_secret}"
-    encoded_credentials = base64.b64encode(credentials.encode()).decode()
-
-    # Request token from Sberbank's NGW endpoint
+    
     url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -97,27 +101,33 @@ def _get_gigachat_token() -> str | None:
         "RqUID": str(uuid.uuid4()),  # UUID4 as per official documentation
     }
     data = b"scope=GIGACHAT_API_PERS"
-
+    
     try:
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
         # Create SSL context based on GIGACHAT_SSL_VERIFY setting
         # GigaChat uses self-signed certificates in their certificate chain,
         # so verification is disabled by default (GIGACHAT_SSL_VERIFY=false).
         # For production, set GIGACHAT_SSL_VERIFY=true and add GigaChat CA to trust store.
-        if not _ssl_verify:
+        if not ssl_verify:
             import ssl
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
             with urllib.request.urlopen(req, timeout=10, context=ssl_context) as response:
                 result = json.loads(response.read().decode())
-                return result.get("access_token")
+                token = result.get("access_token")
+                if token:
+                    logger.debug("OAuth token fetched successfully (mode=%s)", mode)
+                return token
         else:
             with urllib.request.urlopen(req, timeout=10) as response:
                 result = json.loads(response.read().decode())
-                return result.get("access_token")
+                token = result.get("access_token")
+                if token:
+                    logger.debug("OAuth token fetched successfully (mode=%s, SSL verified)", mode)
+                return token
     except Exception as e:
-        logger.debug("Failed to fetch GigaChat token: %s", e)
+        logger.debug("Failed to fetch GigaChat token (mode=%s): %s", mode, e)
         return None
 
 

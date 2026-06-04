@@ -27,22 +27,49 @@ uv pip install gigachat==0.2.2a1
 
 1. Зарегистрируйтесь на [GigaChat Developer Portal](https://developers.sber.ru/)
 2. Создайте приложение в личном кабинете
-3. Получите `Client ID` и `Client Secret`
+3. Получите `Client ID` и `Client Secret` (статические ключи, не меняются)
 
 ### 2. Настройка Hermes
 
+**Режим 1: Прямой API токен (просто, но требует обновления)**
+
 ```bash
-# Через Hermes CLI (рекомендуется)
+# Через Hermes CLI
+hermes config set GIGACHAT_API_TOKEN ваш_access_token
+
+# Или через переменные окружения
+export GIGACHAT_API_TOKEN=ваш_access_token
+```
+
+- ✅ Просто: скопируйте токен из кабинета разработчика
+- ⚠️ Access token действует **30 минут** — после истечения нужно получить новый вручную
+- 💡 Подходит для разовых сессий, тестирования
+
+**Режим 2: Client credentials (автономная работа)**
+
+```bash
+# Через Hermes CLI (рекомендуется для production)
 hermes config set GIGACHAT_CLIENT_ID ваш_client_id
 hermes config set GIGACHAT_CLIENT_SECRET ваш_client_secret
 
 # Или через переменные окружения
 export GIGACHAT_CLIENT_ID=ваш_client_id
 export GIGACHAT_CLIENT_SECRET=ваш_client_secret
+```
 
-# Или через pre-computed токен
+- ✅ Автономно: плагин автоматически получает новый access token при каждом запросе
+- ✅ Client ID + Client Secret **не меняются** — выдаются один раз при создании приложения
+- 💡 Подходит для постоянной работы, не требует ручного обновления токена
+
+**Режим 3: Base64-encoded credentials (альтернатива)**
+
+```bash
+# Закодировать credentials: echo -n "client_id:client_secret" | base64
 export GIGACHAT_API_TOKEN=base64(client_id:client_secret)
 ```
+
+- Эквивалентно режиму 2, но в одной переменной
+- Плагин автоматически распознаёт формат и запускает OAuth flow
 
 ### 3. SSL-верификация
 

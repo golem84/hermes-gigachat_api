@@ -351,6 +351,20 @@ class TestMemoryStoreRemove:
         assert result["success"] is False
 
 
+class TestMemoryStoreRead:
+    def test_read_returns_current_disk_entries(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: tmp_path)
+        mem_file = tmp_path / "MEMORY.md"
+        mem_file.write_text("fact A\n§\nfact B", encoding="utf-8")
+
+        store = MemoryStore(memory_char_limit=500, user_char_limit=300)
+        result = store.read("memory")
+
+        assert result["success"] is True
+        assert result["entries"] == ["fact A", "fact B"]
+        assert result["message"] == "Entries read."
+
+
 class TestMemoryStorePersistence:
     def test_save_and_load_roundtrip(self, tmp_path, monkeypatch):
         monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: tmp_path)
@@ -369,7 +383,7 @@ class TestMemoryStorePersistence:
         monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: tmp_path)
         # Write file with duplicates
         mem_file = tmp_path / "MEMORY.md"
-        mem_file.write_text("duplicate entry\n§\nduplicate entry\n§\nunique entry")
+        mem_file.write_text("duplicate entry\n§\nduplicate entry\n§\nunique entry", encoding="utf-8")
 
         store = MemoryStore()
         store.load_from_disk()
@@ -423,6 +437,12 @@ class TestMemoryToolDispatcher:
     def test_remove_requires_old_text(self, store):
         result = json.loads(memory_tool(action="remove", store=store))
         assert result["success"] is False
+
+    def test_read_via_tool(self, store):
+        store.add("memory", "via read")
+        result = json.loads(memory_tool(action="read", target="memory", store=store))
+        assert result["success"] is True
+        assert result["entries"] == ["via read"]
 
 
 # =========================================================================

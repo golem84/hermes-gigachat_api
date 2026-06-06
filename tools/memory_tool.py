@@ -440,6 +440,13 @@ class MemoryStore:
 
         return self._success_response(target, "Entry removed.")
 
+    def read(self, target: str) -> Dict[str, Any]:
+        """Return the current live entries for a target from disk."""
+        entries = self._read_file(self._path_for(target))
+        entries = list(dict.fromkeys(entries))
+        self._set_entries(target, entries)
+        return self._success_response(target, "Entries read.")
+
     def format_for_system_prompt(self, target: str) -> Optional[str]:
         """
         Return the frozen snapshot for system prompt injection.
@@ -634,8 +641,11 @@ def memory_tool(
             return tool_error("old_text is required for 'remove' action.", success=False)
         result = store.remove(target, old_text)
 
+    elif action == "read":
+        result = store.read(target)
+
     else:
-        return tool_error(f"Unknown action '{action}'. Use: add, replace, remove", success=False)
+        return tool_error(f"Unknown action '{action}'. Use: add, replace, remove, read", success=False)
 
     return json.dumps(result, ensure_ascii=False)
 
@@ -671,7 +681,7 @@ MEMORY_SCHEMA = {
         "- 'user': who the user is -- name, role, preferences, communication style, pet peeves\n"
         "- 'memory': your notes -- environment facts, project conventions, tool quirks, lessons learned\n\n"
         "ACTIONS: add (new entry), replace (update existing -- old_text identifies it), "
-        "remove (delete -- old_text identifies it).\n\n"
+        "remove (delete -- old_text identifies it), read (inspect current entries).\n\n"
         "SKIP: trivial/obvious info, things easily re-discovered, raw data dumps, and temporary task state."
     ),
     "parameters": {
@@ -679,7 +689,7 @@ MEMORY_SCHEMA = {
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["add", "replace", "remove"],
+                "enum": ["add", "replace", "remove", "read"],
                 "description": "The action to perform."
             },
             "target": {

@@ -69,6 +69,11 @@ class ProviderProfile:
     default_headers: dict[str, str] = field(default_factory=dict)
 
     # ── Request-level quirks ─────────────────────────────────
+    # Tool payload format. Most OpenAI-compatible providers accept the modern
+    # top-level `tools` parameter. Legacy OpenAI-compatible shims can set this
+    # to `functions_extra_body` to receive converted functions under
+    # extra_body["functions"] instead.
+    tool_format: str = "openai_tools"
     # Temperature: None = use caller's default, OMIT_TEMPERATURE = don't send
     fixed_temperature: Any = None
     default_max_tokens: int | None = None

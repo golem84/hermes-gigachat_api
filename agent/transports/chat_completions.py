@@ -10,6 +10,7 @@ reasoning configuration, temperature handling, and extra_body assembly.
 """
 
 import copy
+import json
 from typing import Any, Dict
 
 from agent.lmstudio_reasoning import resolve_lmstudio_effort
@@ -465,11 +466,14 @@ class ChatCompletionsTransport(ProviderTransport):
         if timeout is not None:
             api_kwargs["timeout"] = timeout
 
-        # Tools — apply Moonshot/Kimi schema sanitization regardless of path
+        # Tools — apply Moonshot/Kimi schema sanitization regardless of path.
+        # Most providers accept OpenAI's top-level `tools`. Legacy providers
+        # such as GigaChat require provider-specific conversion below.
         if tools:
             if is_moonshot_model(model):
                 tools = sanitize_moonshot_tools(tools)
-            api_kwargs["tools"] = tools
+            if getattr(profile, "tool_format", "openai_tools") == "openai_tools":
+                api_kwargs["tools"] = tools
 
         # max_tokens resolution — priority: ephemeral > user > profile default
         max_tokens_fn = params.get("max_tokens_param_fn")
@@ -497,6 +501,7 @@ class ChatCompletionsTransport(ProviderTransport):
                 reasoning_config=reasoning_config,
                 supports_reasoning=params.get("supports_reasoning", False),
                 qwen_session_metadata=params.get("qwen_session_metadata"),
+                tools=tools,
                 model=model,
                 ollama_num_ctx=params.get("ollama_num_ctx"),
                 session_id=params.get("session_id"),
@@ -582,6 +587,30 @@ class ChatCompletionsTransport(ProviderTransport):
                         provider_data=tc_provider_data or None,
                     )
                 )
+        else:
+            # Legacy OpenAI-compatible providers can return `function_call`
+            # instead of modern `tool_calls`. Normalize it so the rest of the
+            # agent loop can dispatch tools uniformly.
+            function_call = getattr(msg, "function_call", None)
+            if function_call is None and hasattr(msg, "model_extra"):
+                model_extra = getattr(msg, "model_extra", None) or {}
+                if isinstance(model_extra, dict):
+                    function_call = model_extra.get("function_call")
+            if function_call:
+                if isinstance(function_call, dict):
+                    name = function_call.get("name")
+                    arguments = function_call.get("arguments", "{}")
+                else:
+                    name = getattr(function_call, "name", None)
+                    arguments = getattr(function_call, "arguments", "{}")
+                if name:
+                    tool_calls = [
+                        ToolCall(
+                            id=f"call_{name}",
+                            name=name,
+                            arguments=arguments if isinstance(arguments, str) else json.dumps(arguments),
+                        )
+                    ]
 
         usage = None
         if hasattr(response, "usage") and response.usage:

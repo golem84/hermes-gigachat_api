@@ -7291,8 +7291,14 @@ def resolve_gigachat_runtime_credentials() -> Dict[str, Any]:
     """
     from hermes_cli.config import get_env_value
     
-    # Import the token fetcher from the plugin
+    # Import the token fetcher from the plugin. Provider discovery imports
+    # bundled plugins from plugins/model-providers/<name> under the synthetic
+    # plugins.model_providers.<name> package; direct import only works after
+    # discovery has run.
     try:
+        import importlib
+        providers_module = importlib.import_module("providers")
+        providers_module.get_provider_profile("gigachat")
         from plugins.model_providers.gigachat import _get_gigachat_token
     except ImportError:
         raise AuthError(

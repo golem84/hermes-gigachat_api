@@ -202,7 +202,12 @@ class GigaChatProfile(ProviderProfile):
             if message.get("role") == "tool":
                 # Convert tool response to function response format
                 processed_msg["role"] = "function"
-                processed_msg["name"] = message.get("tool_call_id", "").split("-")[0]  # Extract function name
+                tool_name = message.get("name") or ""
+                if not tool_name:
+                    tool_call_id = str(message.get("tool_call_id", ""))
+                    tool_name = tool_call_id[5:] if tool_call_id.startswith("call_") else tool_call_id
+                processed_msg["name"] = tool_name
+                processed_msg.pop("tool_call_id", None)
             
             processed_messages.append(processed_msg)
         
@@ -348,6 +353,7 @@ gigachat = GigaChatProfile(
     env_vars=("GIGACHAT_API_TOKEN", "GIGACHAT_CLIENT_ID", "GIGACHAT_CLIENT_SECRET"),
     base_url="https://gigachat.devices.sberbank.ru/api/v1",
     auth_type="oauth_external",  # OAuth token fetched via _get_gigachat_token()
+    tool_format="functions_extra_body",
     # Note: We don't set default_aux_model as GigaChat models are all fairly capable
     # SSL verification: GigaChat uses self-signed certs. Set GIGACHAT_SSL_VERIFY=true for production.
 )

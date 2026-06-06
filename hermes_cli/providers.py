@@ -469,6 +469,37 @@ def get_provider(name: str) -> Optional[ProviderDef]:
             source="hermes",
         )
 
+    # Model-provider plugins register ProviderProfile instances lazily through
+    # the separate ``providers`` registry.  Keep this resolver in sync so
+    # session model switches (/model, TUI, dashboard) can target plugin-backed
+    # providers even when they are not present in models.dev / overlays.
+    try:
+        from providers import get_provider_profile as _get_provider_profile
+
+        profile = _get_provider_profile(canonical)
+    except Exception:
+        profile = None
+
+    if profile is not None:
+        api_mode = profile.api_mode or "chat_completions"
+        if api_mode == "anthropic_messages":
+            transport = "anthropic_messages"
+        elif api_mode in {"codex_responses", "responses"}:
+            transport = "codex_responses"
+        else:
+            transport = "openai_chat"
+
+        return ProviderDef(
+            id=profile.name,
+            name=profile.display_name or _LABEL_OVERRIDES.get(profile.name, profile.name),
+            transport=transport,
+            api_key_env_vars=tuple(profile.env_vars),
+            base_url=profile.base_url,
+            is_aggregator=False,
+            auth_type=profile.auth_type,
+            source="provider-plugin",
+        )
+
     return None
 
 

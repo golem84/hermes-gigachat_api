@@ -5570,6 +5570,50 @@ def _model_flow_kimi(config, current_model=""):
         print("No change.")
 
 
+def _test_gigachat_oauth_credentials(client_id: str, client_secret: str) -> tuple[bool, str]:
+    """Test GigaChat client credentials by fetching an OAuth token."""
+    import base64
+    import ssl
+    import urllib.error
+    import urllib.request
+    import uuid
+
+    credentials = f"{client_id}:{client_secret}"
+    encoded_credentials = base64.b64encode(credentials.encode()).decode()
+
+    url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+        "Authorization": f"Basic {encoded_credentials}",
+        "RqUID": str(uuid.uuid4()),
+    }
+    data = b"scope=GIGACHAT_API_PERS"
+
+    try:
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        with urllib.request.urlopen(req, timeout=10, context=ssl_context) as response:
+            result = json.loads(response.read().decode())
+            if "access_token" in result:
+                return True, ""
+            if "error" in result:
+                return False, f"{result.get('error')}: {result.get('error_description', 'no description')}"
+            return False, "Unexpected response format"
+    except urllib.error.HTTPError as exc:
+        try:
+            body = json.loads(exc.read().decode())
+            detail = body.get("message") or body.get("error_description") or body.get("error") or exc.reason
+            return False, f"HTTP {exc.code}: {detail}"
+        except Exception:
+            return False, f"HTTP {exc.code}: {exc.reason}"
+    except Exception as exc:
+        return False, str(exc)
+
+
 def _model_flow_gigachat(config, current_model="", args=None):
     """GigaChat model selection with OAuth credentials flow.
 
@@ -5596,51 +5640,9 @@ def _model_flow_gigachat(config, current_model="", args=None):
         save_config,
     )
     from hermes_cli.secret_prompt import masked_secret_prompt
-    import urllib.request
-    import urllib.error
-    import json
-    import base64
-    import ssl
 
     provider_id = "gigachat"
     pconfig = PROVIDER_REGISTRY[provider_id]
-
-    def _test_credentials(client_id: str, client_secret: str) -> tuple[bool, str]:
-        """Test credentials by fetching OAuth token. Returns (success, error_message)."""
-        credentials = f"{client_id}:{client_secret}"
-        encoded_credentials = base64.b64encode(credentials.encode()).decode()
-        
-        url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json",
-            "Authorization": f"Basic {encoded_credentials}",
-            "RqUID": "test-credentials",
-        }
-        data = b"scope=GIGACHAT_API_PERS"
-        
-        try:
-            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            
-            with urllib.request.urlopen(req, timeout=10, context=ssl_context) as response:
-                result = json.loads(response.read().decode())
-                if "access_token" in result:
-                    return True, ""
-                elif "error" in result:
-                    return False, f"{result.get('error')}: {result.get('error_description', 'no description')}"
-                else:
-                    return False, "Unexpected response format"
-        except urllib.error.HTTPError as e:
-            try:
-                body = json.loads(e.read().decode())
-                return False, f"HTTP {e.code}: {body.get('message', e.reason)}"
-            except:
-                return False, f"HTTP {e.code}: {e.reason}"
-        except Exception as e:
-            return False, str(e)
 
     # Step 1: Check for existing credentials
     existing_client_id = get_env_value("GIGACHAT_CLIENT_ID") or os.getenv("GIGACHAT_CLIENT_ID", "")
@@ -5673,7 +5675,7 @@ def _model_flow_gigachat(config, current_model="", args=None):
 
             # Test credentials immediately
             print("Testing credentials...")
-            success, error = _test_credentials(client_id, client_secret)
+            success, error = _test_gigachat_oauth_credentials(client_id, client_secret)
             if success:
                 break
             else:
@@ -5701,7 +5703,7 @@ def _model_flow_gigachat(config, current_model="", args=None):
         
         # Test existing credentials
         print("  Testing credentials...")
-        success, error = _test_credentials(existing_client_id, existing_client_secret)
+        success, error = _test_gigachat_oauth_credentials(existing_client_id, existing_client_secret)
         if not success:
             print(f"  ❌ Existing credentials invalid: {error}")
             print()
@@ -5737,7 +5739,7 @@ def _model_flow_gigachat(config, current_model="", args=None):
 
                 # Test new credentials
                 print("Testing new credentials...")
-                success, error = _test_credentials(client_id, client_secret)
+                success, error = _test_gigachat_oauth_credentials(client_id, client_secret)
                 if success:
                     break
                 else:

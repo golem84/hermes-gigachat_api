@@ -1334,6 +1334,18 @@ def run_conversation(
                     or str(agent.base_url or "").lower().startswith("acp+tcp://")
                 ):
                     _use_streaming = False
+                elif (
+                    str(agent.provider or "").strip().lower() == "gigachat"
+                    and isinstance(api_kwargs, dict)
+                    and api_kwargs.get("functions")
+                ):
+                    # GigaChat's legacy function-calling endpoint is reliable
+                    # in non-streaming mode. In streaming mode it can report
+                    # finish_reason="function_call" without exposing a
+                    # structured function_call/tool_calls payload through the
+                    # OpenAI SDK stream chunks, which makes Hermes treat the
+                    # turn as plain text and skip tool execution.
+                    _use_streaming = False
                 elif not agent._has_stream_consumers():
                     # No display/TTS consumer. Still prefer streaming for
                     # health checking, but skip for Mock clients in tests

@@ -191,12 +191,20 @@ class GigaChatProfile(ProviderProfile):
                 if len(message["tool_calls"]) > 0:
                     tool_call = message["tool_calls"][0]
                     if tool_call["type"] == "function":
+                        arguments = tool_call["function"].get("arguments", {})
+                        if isinstance(arguments, str):
+                            try:
+                                arguments = json.loads(arguments) if arguments.strip() else {}
+                            except json.JSONDecodeError:
+                                arguments = {}
                         processed_msg["function_call"] = {
                             "name": tool_call["function"]["name"],
-                            "arguments": tool_call["function"]["arguments"]
+                            "arguments": arguments,
                         }
                         # Remove tool_calls for GigaChat compatibility
                         del processed_msg["tool_calls"]
+                        processed_msg.pop("call_id", None)
+                        processed_msg.pop("response_item_id", None)
             
             # Convert tool response messages
             if message.get("role") == "tool":
@@ -279,7 +287,8 @@ class GigaChatProfile(ProviderProfile):
                         gigachat_functions.append(tool)
             
             if gigachat_functions:
-                extra_body_additions["functions"] = gigachat_functions
+                top_level_kwargs["functions"] = gigachat_functions
+                top_level_kwargs["function_call"] = "auto"
         
         # GigaChat doesn't need special handling for reasoning config
         # beyond what's handled in the standard API call

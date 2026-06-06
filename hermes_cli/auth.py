@@ -7349,12 +7349,17 @@ def resolve_gigachat_runtime_credentials() -> Dict[str, Any]:
     client_secret = get_env_value("GIGACHAT_CLIENT_SECRET") or os.getenv("GIGACHAT_CLIENT_SECRET", "")
     api_token = get_env_value("GIGACHAT_API_TOKEN") or os.getenv("GIGACHAT_API_TOKEN", "")
     
-    # Set in os.environ for the plugin to read
+    # Set in os.environ for the plugin to read. Prefer renewable client
+    # credentials over a possibly stale GIGACHAT_API_TOKEN; the plugin checks
+    # GIGACHAT_API_TOKEN first, so leaving an old token in-process can make a
+    # freshly validated client_id/client_secret fail immediately afterward.
     if client_id:
         os.environ["GIGACHAT_CLIENT_ID"] = client_id
     if client_secret:
         os.environ["GIGACHAT_CLIENT_SECRET"] = client_secret
-    if api_token:
+    if client_id and client_secret:
+        os.environ.pop("GIGACHAT_API_TOKEN", None)
+    elif api_token:
         os.environ["GIGACHAT_API_TOKEN"] = api_token
 
     access_token = _get_gigachat_token()

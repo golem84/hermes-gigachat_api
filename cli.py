@@ -3055,6 +3055,16 @@ def save_config_value(key_path: str, value: any) -> bool:
             os.chmod(config_path, 0o600)
         except (OSError, NotImplementedError):
             pass
+
+        # Keep the live CLI session in sync with the on-disk config.  The
+        # interactive app reads from the module-level CLI_CONFIG dict, so a
+        # persisted /model change must update that object in place.
+        try:
+            refreshed = load_cli_config()
+            CLI_CONFIG.clear()
+            CLI_CONFIG.update(refreshed)
+        except Exception:
+            pass
         
         return True
     except Exception as e:

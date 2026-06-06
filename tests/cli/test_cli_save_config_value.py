@@ -59,6 +59,18 @@ class TestSaveConfigValueAtomic:
         result = yaml.safe_load(config_env.read_text())
         assert result["display"]["skin"] == "ares"
 
+    def test_updates_live_cli_config_in_place(self, config_env):
+        """Persisting model.default should refresh the live CLI_CONFIG dict."""
+        import cli as cli_mod
+
+        original_id = id(cli_mod.CLI_CONFIG)
+
+        from cli import save_config_value
+        save_config_value("model.default", "giga-chat-pro")
+
+        assert id(cli_mod.CLI_CONFIG) == original_id
+        assert cli_mod.CLI_CONFIG["model"]["default"] == "giga-chat-pro"
+
     def test_preserves_env_ref_templates_in_unrelated_fields(self, config_env):
         """The /model --global persistence path must not inline env-backed secrets."""
         config_env.write_text(yaml.dump({

@@ -10,6 +10,7 @@ import json
 import os
 import time
 import base64
+import re
 import urllib.request
 from typing import Any
 
@@ -17,6 +18,25 @@ from providers import register_provider
 from providers.base import ProviderProfile
 
 logger = __import__("logging").getLogger(__name__)
+
+
+_UNTRUSTED_TOOL_RESULT_RE = re.compile(
+    r'^<untrusted_tool_result source="[^"]+">\n.*?\n\n(.*)\n</untrusted_tool_result>\s*$',
+    re.DOTALL,
+)
+
+
+def _unwrap_untrusted_tool_result(content: Any) -> Any:
+    """Strip Hermes untrusted-result framing for GigaChat function messages."""
+    if not isinstance(content, str):
+        return content
+    text = content.lstrip()
+    if not text.startswith("<untrusted_tool_result"):
+        return content
+    match = _UNTRUSTED_TOOL_RESULT_RE.match(text)
+    if not match:
+        return content
+    return match.group(1)
 
 
 def _get_gigachat_token() -> str | None:
@@ -215,6 +235,7 @@ class GigaChatProfile(ProviderProfile):
                     tool_call_id = str(message.get("tool_call_id", ""))
                     tool_name = tool_call_id[5:] if tool_call_id.startswith("call_") else tool_call_id
                 processed_msg["name"] = tool_name
+                processed_msg["content"] = _unwrap_untrusted_tool_result(processed_msg.get("content"))
                 processed_msg.pop("tool_call_id", None)
             
             processed_messages.append(processed_msg)

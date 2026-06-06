@@ -5633,6 +5633,7 @@ def _model_flow_gigachat(config, current_model="", args=None):
         AuthError,
         format_auth_error,
     )
+    from providers import get_provider_profile
     from hermes_cli.config import (
         get_env_value,
         save_env_value,
@@ -5643,6 +5644,7 @@ def _model_flow_gigachat(config, current_model="", args=None):
 
     provider_id = "gigachat"
     pconfig = PROVIDER_REGISTRY[provider_id]
+    profile = get_provider_profile(provider_id)
 
     # Step 1: Check for existing credentials
     existing_client_id = get_env_value("GIGACHAT_CLIENT_ID") or os.getenv("GIGACHAT_CLIENT_ID", "")
@@ -5771,9 +5773,12 @@ def _model_flow_gigachat(config, current_model="", args=None):
         print("Please check your Client ID and Client Secret and re-run `hermes model`.")
         return
 
-    # Step 3: Fetch models from GigaChat API
-    from hermes_cli.models import _PROVIDER_MODELS
-    model_ids = list(_PROVIDER_MODELS.get("gigachat", []))
+    # Step 3: Fetch models from the live GigaChat API.
+    model_fetcher = getattr(profile, "fetch_models", None) if profile is not None else None
+    if callable(model_fetcher):
+        model_ids = model_fetcher(api_key=creds["api_key"], timeout=8.0) or []
+    else:
+        model_ids = []
 
     if not model_ids:
         print("  Could not fetch model list from GigaChat API.")

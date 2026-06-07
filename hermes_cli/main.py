@@ -5582,6 +5582,7 @@ def _test_gigachat_oauth_credentials(client_id: str, client_secret: str) -> tupl
     encoded_credentials = base64.b64encode(credentials.encode()).decode()
 
     url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+    timeout_seconds = float(os.getenv("GIGACHAT_OAUTH_TIMEOUT", "30"))
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "application/json",
@@ -5596,7 +5597,7 @@ def _test_gigachat_oauth_credentials(client_id: str, client_secret: str) -> tupl
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
 
-        with urllib.request.urlopen(req, timeout=10, context=ssl_context) as response:
+        with urllib.request.urlopen(req, timeout=timeout_seconds, context=ssl_context) as response:
             result = json.loads(response.read().decode())
             if "access_token" in result:
                 return True, ""
@@ -5775,6 +5776,8 @@ def _model_flow_gigachat(config, current_model="", args=None):
         return
 
     # Step 3: Fetch the live, normalized GigaChat model catalog.
+    # This goes through the shared model helper so the wizard sees the same
+    # stable chat tiers as `/model`, not the raw /models payload.
     model_ids = provider_model_ids(provider_id, force_refresh=True)
 
     if not model_ids:

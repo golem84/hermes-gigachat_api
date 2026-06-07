@@ -189,27 +189,30 @@ def test_gigachat_fetch_models_filters_non_chat_entries(monkeypatch):
                     "data": [
                         {
                             "id": "GigaChat-Max",
-                            "model_picker_enabled": True,
                             "capabilities": {"type": "chat"},
                         },
                         {
-                            "id": "GigaChat-Pro",
-                            "model_picker_enabled": True,
+                            "id": "GigaChat-Pro-preview",
                             "capabilities": {"type": "chat"},
                         },
                         {
-                            "id": "GigaChat-Lite",
-                            "model_picker_enabled": True,
+                            "id": "GigaChat-2-Pro",
+                            "capabilities": {"type": "chat"},
+                        },
+                        {
+                            "id": "GigaChat-2",
                             "capabilities": {"type": "chat"},
                         },
                         {
                             "id": "Embeddings",
-                            "model_picker_enabled": True,
-                            "capabilities": {"type": "embedding"},
+                            "capabilities": {"type": "embedder"},
                         },
                         {
-                            "id": "GigaChat-Max-preview",
-                            "model_picker_enabled": False,
+                            "id": "Embeddings-2",
+                            "capabilities": {"type": "embedder"},
+                        },
+                        {
+                            "id": "GigaChat",
                             "capabilities": {"type": "chat"},
                         },
                     ]
@@ -256,3 +259,28 @@ def test_gigachat_provider_model_ids_use_live_catalog(monkeypatch):
         "GigaChat-Pro",
         "GigaChat-Lite",
     ]
+
+
+def test_gigachat_model_picker_uses_live_catalog(monkeypatch):
+    from hermes_cli.model_switch import list_authenticated_providers
+
+    monkeypatch.setenv("GIGACHAT_CLIENT_ID", "client-id")
+    monkeypatch.setenv("GIGACHAT_CLIENT_SECRET", "client-secret")
+    monkeypatch.setattr(
+        "hermes_cli.models.provider_model_ids",
+        lambda provider, force_refresh=False: [
+            "GigaChat-Max",
+            "GigaChat-Pro",
+            "GigaChat-Lite",
+        ] if provider == "gigachat" else [],
+    )
+
+    providers = list_authenticated_providers(max_models=50)
+    gigachat = next(row for row in providers if row["slug"] == "gigachat")
+
+    assert gigachat["models"] == [
+        "GigaChat-Max",
+        "GigaChat-Pro",
+        "GigaChat-Lite",
+    ]
+    assert gigachat["total_models"] == 3

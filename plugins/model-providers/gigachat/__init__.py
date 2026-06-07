@@ -122,6 +122,8 @@ def _fetch_token_oauth(encoded_credentials: str, ssl_verify: bool, mode: str) ->
     }
     data = b"scope=GIGACHAT_API_PERS"
     
+    timeout_seconds = float(os.getenv("GIGACHAT_OAUTH_TIMEOUT", "30"))
+
     try:
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
         # Create SSL context based on GIGACHAT_SSL_VERIFY setting
@@ -133,14 +135,14 @@ def _fetch_token_oauth(encoded_credentials: str, ssl_verify: bool, mode: str) ->
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=10, context=ssl_context) as response:
+            with urllib.request.urlopen(req, timeout=timeout_seconds, context=ssl_context) as response:
                 result = json.loads(response.read().decode())
                 token = result.get("access_token")
                 if token:
                     logger.debug("OAuth token fetched successfully (mode=%s)", mode)
                 return token
         else:
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
                 result = json.loads(response.read().decode())
                 token = result.get("access_token")
                 if token:
@@ -223,7 +225,12 @@ def _gigachat_catalog_item_is_chat_model(item: dict[str, Any]) -> bool:
 
 
 def _gigachat_canonical_model_name(model_id: str) -> str | None:
-    """Map a raw catalog id to the stable chat tier shown in Hermes."""
+    """Map a raw catalog id to the stable chat tier shown in Hermes.
+
+    GigaChat exposes a broader live catalog than the app should surface in
+    the default model picker: preview builds, compatibility aliases, and
+    embeddings. The picker should present only the stable chat tiers.
+    """
 
     raw = str(model_id or "").strip()
     if not raw:
@@ -235,51 +242,22 @@ def _gigachat_canonical_model_name(model_id: str) -> str | None:
 
     import re
 
+    # Stable chat tiers. GigaChat/GigaChat-2 are compatibility aliases for
+    # the lightweight tier in the current public catalog.
     if re.fullmatch(r"gigachat(?:-2)?(?:-lite)?", lowered):
         return "GigaChat-Lite"
     if re.fullmatch(r"gigachat(?:-2)?-pro", lowered):
         return "GigaChat-Pro"
     if re.fullmatch(r"gigachat(?:-2)?-max", lowered):
         return "GigaChat-Max"
+
+    # Older stable aliases still count as chat models, but we do not surface
+    # them as separate picker entries because the public product page only
+    # exposes the current stable tiers.
     if lowered in {"gigachat", "gigachat-2"}:
         return "GigaChat-Lite"
 
     return None
-
-
-    """Return True for user-selectable chat models.
-
-    The GigaChat catalog can include embeddings and preview/test entries.
-    Those should stay out of the default model picker unless the API marks
-    them as picker-enabled chat models.
-    """
-
-    model_id = str(item.get("id") or "").strip()
-    if not model_id:
-        return False
-
-    if item.get("model_picker_enabled") is False:
-        return False
-
-    capabilities = item.get("capabilities")
-    if isinstance(capabilities, dict):
-        model_type = str(capabilities.get("type") or "").strip().lower()
-        if model_type and model_type != "chat":
-            return False
-
-    supported_endpoints = item.get("supported_endpoints")
-    if isinstance(supported_endpoints, list):
-        normalized_endpoints = {
-            str(endpoint).strip()
-            for endpoint in supported_endpoints
-            if str(endpoint).strip()
-        }
-        if normalized_endpoints and not normalized_endpoints.intersection(
-            {"/chat/completions", "/responses", "/v1/messages"}
-        ):
-            return False
-
-    return True
 
 
 class GigaChatProfile(ProviderProfile):

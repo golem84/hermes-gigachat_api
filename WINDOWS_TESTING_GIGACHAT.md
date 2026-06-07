@@ -26,7 +26,7 @@ cd hermes-gigachat_api
 # 2. Checkout the gigachat-plugin branch
 git checkout gigachat-plugin
 
-# 3. Install uv (Python package manager), or don't if already done it before!
+# 3. Install uv (Python package manager)
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 # 4. Create virtual environment
@@ -148,15 +148,6 @@ python3 -c "from hermes_cli.models import _PROVIDER_MODELS; print('Curated:', _P
 
 If the model list doesn't load:
 
-### If `.venv` has no `pip`
-
-Some Windows venvs are created without bundled `pip`. Bootstrap it once:
-
-```powershell
-.\.venv\Scripts\python.exe -m ensurepip --upgrade
-.\.venv\Scripts\python.exe -m pip install -e .
-```
-
 ### Enable verbose logging
 
 ```bash
@@ -259,16 +250,13 @@ When running `hermes model` with valid GigaChat credentials:
     N. GigaChat  ← currently active
     ...
 
-  Found 6 model(s) from GigaChat API
+  Found 3 model(s) from GigaChat API
   Select a model:
     1. GigaChat-Max
-    2. GigaChat-Plus
-    3. GigaChat-Pro
-    4. GigaChat-Max-Turbo
-    5. GigaChat-Plus-0920
-    6. GigaChat-Max-0920
-    7. Enter custom model name
-    8. Cancel
+    2. GigaChat-Pro
+    3. GigaChat-Lite
+    4. Enter custom model name
+    5. Cancel
 ```
 
 If API is unavailable, falls back to:

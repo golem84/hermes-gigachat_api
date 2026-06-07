@@ -126,10 +126,6 @@ def test_gigachat_model_switch_accepts_provider_plugin(monkeypatch):
 
 
 def test_gigachat_model_flow_fetches_live_models(monkeypatch):
-    from providers import get_provider_profile
-    import hermes_cli.models as models_mod
-
-    profile = get_provider_profile("gigachat")
     captured = {}
 
     monkeypatch.setattr(
@@ -147,23 +143,14 @@ def test_gigachat_model_flow_fetches_live_models(monkeypatch):
             "base_url": "https://gigachat.devices.sberbank.ru/api/v1",
         },
     )
-    monkeypatch.setitem(
-        models_mod._PROVIDER_MODELS,
-        "gigachat",
-        ["wrong-static-model"],
-    )
     monkeypatch.setattr(
-        "hermes_cli.auth.resolve_gigachat_runtime_credentials",
-        lambda: {
-            "api_key": "access-token",
-            "base_url": "https://gigachat.devices.sberbank.ru/api/v1",
-        },
+        "hermes_cli.models.provider_model_ids",
+        lambda provider, force_refresh=False: [
+            "GigaChat-Max",
+            "GigaChat-Pro",
+            "GigaChat-Lite",
+        ] if provider == "gigachat" else [],
     )
-    monkeypatch.setattr(profile, "fetch_models", lambda *, api_key=None, timeout=8.0: [
-        "GigaChat-Max",
-        "GigaChat-Pro",
-        "GigaChat-Lite",
-    ])
 
     def fake_prompt_model_selection(model_ids, current_model="", **kwargs):
         captured["model_ids"] = list(model_ids)

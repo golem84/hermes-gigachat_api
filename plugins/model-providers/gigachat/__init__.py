@@ -222,6 +222,66 @@ def _gigachat_catalog_item_is_chat_model(item: dict[str, Any]) -> bool:
     return True
 
 
+def _gigachat_canonical_model_name(model_id: str) -> str | None:
+    """Map a raw catalog id to the stable chat tier shown in Hermes."""
+
+    raw = str(model_id or "").strip()
+    if not raw:
+        return None
+
+    lowered = raw.lower()
+    if "embed" in lowered or lowered.endswith("-preview"):
+        return None
+
+    import re
+
+    if re.fullmatch(r"gigachat(?:-2)?(?:-lite)?", lowered):
+        return "GigaChat-Lite"
+    if re.fullmatch(r"gigachat(?:-2)?-pro", lowered):
+        return "GigaChat-Pro"
+    if re.fullmatch(r"gigachat(?:-2)?-max", lowered):
+        return "GigaChat-Max"
+    if lowered in {"gigachat", "gigachat-2"}:
+        return "GigaChat-Lite"
+
+    return None
+
+
+    """Return True for user-selectable chat models.
+
+    The GigaChat catalog can include embeddings and preview/test entries.
+    Those should stay out of the default model picker unless the API marks
+    them as picker-enabled chat models.
+    """
+
+    model_id = str(item.get("id") or "").strip()
+    if not model_id:
+        return False
+
+    if item.get("model_picker_enabled") is False:
+        return False
+
+    capabilities = item.get("capabilities")
+    if isinstance(capabilities, dict):
+        model_type = str(capabilities.get("type") or "").strip().lower()
+        if model_type and model_type != "chat":
+            return False
+
+    supported_endpoints = item.get("supported_endpoints")
+    if isinstance(supported_endpoints, list):
+        normalized_endpoints = {
+            str(endpoint).strip()
+            for endpoint in supported_endpoints
+            if str(endpoint).strip()
+        }
+        if normalized_endpoints and not normalized_endpoints.intersection(
+            {"/chat/completions", "/responses", "/v1/messages"}
+        ):
+            return False
+
+    return True
+
+
 class GigaChatProfile(ProviderProfile):
     """GigaChat provider profile.
 
@@ -393,16 +453,25 @@ class GigaChatProfile(ProviderProfile):
                 with urllib.request.urlopen(req, timeout=timeout) as response:
                     data = json.loads(response.read().decode())
 
-            # Extract only chat-model IDs from the live catalog.
+            # Extract only stable chat tiers from the live catalog.
             models = []
+            seen: set[str] = set()
             if isinstance(data, dict) and "data" in data:
                 for item in data["data"]:
-                    if isinstance(item, dict) and _gigachat_catalog_item_is_chat_model(item):
-                        models.append(item["id"])
+                    if not isinstance(item, dict) or not _gigachat_catalog_item_is_chat_model(item):
+                        continue
+                    canonical = _gigachat_canonical_model_name(str(item.get("id") or ""))
+                    if canonical and canonical not in seen:
+                        seen.add(canonical)
+                        models.append(canonical)
             elif isinstance(data, list):
                 for item in data:
-                    if isinstance(item, dict) and _gigachat_catalog_item_is_chat_model(item):
-                        models.append(item["id"])
+                    if not isinstance(item, dict) or not _gigachat_catalog_item_is_chat_model(item):
+                        continue
+                    canonical = _gigachat_canonical_model_name(str(item.get("id") or ""))
+                    if canonical and canonical not in seen:
+                        seen.add(canonical)
+                        models.append(canonical)
 
             return models if models else None
 

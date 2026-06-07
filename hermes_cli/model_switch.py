@@ -1494,7 +1494,14 @@ def list_authenticated_providers(
         if not has_creds:
             continue
 
-        if hermes_slug in {"openai-codex", "copilot", "copilot-acp"}:
+        if hermes_slug == "gigachat":
+            try:
+                from hermes_cli.models import provider_model_ids
+
+                model_ids = provider_model_ids(hermes_slug)
+            except Exception:
+                model_ids = []
+        elif hermes_slug in {"openai-codex", "copilot", "copilot-acp"}:
             # Use live OAuth-backed discovery so the gateway /model picker
             # matches what the user's authenticated Codex/Copilot backend
             # actually serves — including ChatGPT-Pro-only Codex slugs

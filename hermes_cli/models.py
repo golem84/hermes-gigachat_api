@@ -2320,7 +2320,7 @@ def _credential_fingerprint(provider: str) -> str:
     # Catalog-shape salt: bump when a provider's live model filter changes
     # so stale on-disk picker caches do not preserve an old catalog shape.
     if provider == "gigachat":
-        parts.append("gigachat-model-catalog=v2")
+        parts.append("gigachat-model-catalog=v3")
 
     # Env vars from PROVIDER_REGISTRY for this slug
     try:

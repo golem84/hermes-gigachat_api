@@ -185,6 +185,31 @@ GigaChat использует **нативный `functions` формат**, а 
 }
 ```
 
+## Готовность к релизу
+
+Плагин готов к релизу для проверенных сценариев Hermes Agent:
+
+- аутентификация через `Client ID` / `Client Secret`
+- выбор модели из `hermes model` и `/model`
+- загрузка актуального списка моделей из API, без захардкоженного каталога
+- `function calling` для обычных инструментов Hermes
+- работа с MCP-инструментами через Hermes (`mcp_time_get_current_time`, `mcp_time_convert_time`)
+
+### Выполненные проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `python -m pytest tests\\hermes_cli\\test_gigachat_model_flow.py -q -p no:timeout -p no:cacheprovider -o addopts=""` | `8/8 passed` |
+| `hermes mcp test time` | `1/1 passed` (`✓ Connected`, `2` инструмента обнаружены) |
+| `python -m py_compile hermes_cli\\mcp_startup.py` | `1/1 passed` |
+
+### Что ещё не покрыто полностью
+
+- все MCP-серверы, кроме `time`
+- TUI, desktop, gateway и cron-режимы
+- медленные или падающие MCP-серверы
+- полный регресс по всем провайдерам моделей, не только GigaChat
+
 ## API Endpoints
 
 | Endpoint | Назначение | SSL |

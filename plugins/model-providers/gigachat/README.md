@@ -202,7 +202,18 @@ GigaChat использует **нативный `functions` формат**, а 
 | `python -m pytest tests\\hermes_cli\\test_gigachat_model_flow.py -q -p no:timeout -p no:cacheprovider -o addopts=""` | `8/8 passed` |
 | `hermes mcp test time` | `1/1 passed` (`✓ Connected`, `2` инструмента обнаружены) |
 | `python -m py_compile hermes_cli\\mcp_startup.py` | `1/1 passed` |
+| `python -m pytest tests\\cron\\test_cron_profile.py -q -p no:timeout -p no:cacheprovider -o addopts=""` | `20/20 passed` |
+| `python -m pytest tests\\cron\\test_cron_script.py -q -p no:timeout -p no:cacheprovider -o addopts=""` | `35 passed, 1 skipped` |
 | provider-regress (все model providers, Windows) | `1359/1359 passed`, `0 failed`, `48` файлов, `111.0s` |
+
+### Проверка cron режима (2026-06-07)
+
+Проверка cron-режима выполнена на Windows через Python-совместимые cron-тесты:
+
+- `tests\\cron\\test_cron_profile.py` — `20/20 passed`
+- `tests\\cron\\test_cron_script.py` — `35 passed, 1 skipped`
+
+Эти прогоны подтвердили cron-runtime контекст, изоляцию профилей, последовательное выполнение profile jobs и работу script injection / containment без зависимости от bash-скриптов.
 
 ### Полный регресс по всем провайдерам моделей (2026-06-07)
 
@@ -284,7 +295,7 @@ python scripts/run_tests_parallel.py \
 ### Что ещё не покрыто полностью
 
 - все MCP-серверы, кроме `time`
-- TUI, desktop, gateway и cron-режимы
+- TUI, desktop и gateway
 - медленные или падающие MCP-серверы
 - дальнейшее расширение provider-regression за рамки уже зелёного набора
 

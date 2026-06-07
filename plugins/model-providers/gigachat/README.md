@@ -1,348 +1,235 @@
 # GigaChat Provider Plugin for Hermes Agent
 
-Интеграция GigaChat API в Hermes Agent с поддержкой function calling.
+GigaChat provider plugin for Hermes Agent with chat, model selection, and `function calling` support.
 
-## Официальная документация
+This plugin exists as a dedicated adapter because GigaChat uses a native `functions` format and Hermes needs a custom compatibility layer to speak it in the usual OpenAI-shaped contract. The generic provider path is not precise enough here: `tools` / `tool_calls` / `tool.role="tool"` need explicit translation to and from GigaChat's format.
 
-- **Основная документация**: https://developers.sber.ru/docs/ru/gigachat
-- **API Reference**: https://developers.sber.ru/docs/ru/gigachat/reference
-- **Быстрый старт**: https://developers.sber.ru/docs/ru/gigachat/guides/quickstart
-- **Авторизация и токены**: https://developers.sber.ru/docs/ru/gigachat/guides/auth
-- **Function Calling**: https://developers.sber.ru/docs/ru/gigachat/guides/functions
-- **Ограничения и квоты**: https://developers.sber.ru/docs/ru/gigachat/guides/limits
+## Quick Summary
 
-## Установка и настройка
+- Works in `hermes chat`, `hermes model`, `hermes mcp`, and the shared Hermes gateway/TUI/Desktop stack.
+- Supports Linux, macOS, Windows, and WSL2.
+- No official Python SDK is required for standard chat and `function calling`.
+- The official SDK is optional for advanced features.
 
-### 0. Установка зависимости (опционально)
+## Official GigaChat Docs
 
-Для расширенных функций (embeddings, vision, файлы) установите официальный Python SDK:
+- [Main docs](https://developers.sber.ru/docs/ru/gigachat)
+- [API reference](https://developers.sber.ru/docs/ru/gigachat/reference)
+- [Quick start](https://developers.sber.ru/docs/ru/gigachat/guides/quickstart)
+- [Auth and tokens](https://developers.sber.ru/docs/ru/gigachat/guides/auth)
+- [Function calling](https://developers.sber.ru/docs/ru/gigachat/guides/functions)
+- [Limits](https://developers.sber.ru/docs/ru/gigachat/guides/limits)
 
-```bash
-uv pip install gigachat==0.2.2a1
-```
+## Getting Started
 
-**Примечание:** Базовый чат и function calling работают без этой зависимости — плагин использует прямой HTTP API.
+### 1. Get credentials
 
-### 1. Получение учётных данных
+1. Register at the [GigaChat Developer Portal](https://developers.sber.ru/).
+2. Create an application.
+3. Copy `Client ID` and `Client Secret`.
 
-1. Зарегистрируйтесь на [GigaChat Developer Portal](https://developers.sber.ru/)
-2. Создайте приложение в личном кабинете
-3. Получите `Client ID` и `Client Secret` (статические ключи, не меняются)
+### 2. Configure with `hermes model`
 
-### 2. Настройка через `hermes model` (рекомендуется)
-
-Запустите интерактивный мастер настройки:
+This is the recommended path for most users:
 
 ```bash
 hermes model
 ```
 
-1. В списке провайдеров выберите `gigachat`
-2. Введите `Client ID` (или нажмите Enter для использования текущего значения)
-3. Введите `Client Secret` (или нажмите Enter для использования текущего значения)
-4. Плагин проверит credentials и загрузит список доступных моделей
-5. Выберите модель из списка (текущая модель отмечается маркером `←`)
-6. Настройка завершена
+Then:
 
-**Преимущества:**
-- ✅ Интерактивный ввод с маской для секрета
-- ✅ Автоматическая проверка credentials
-- ✅ Загрузка актуального списка моделей из API
-- ✅ Сохранение в `~/.hermes/.env` и `~/.hermes/config.yaml`
+1. Choose `gigachat`.
+2. Enter `Client ID`.
+3. Enter `Client Secret`.
+4. Wait for credential verification.
+5. Pick a model from the live list.
 
-### 3. Ручная настройка (альтернатива)
-
-**Режим 1: Client credentials (автономная работа, рекомендуется)**
+### 3. Start chatting
 
 ```bash
-# Через Hermes CLI
-hermes config set GIGACHAT_CLIENT_ID ваш_client_id
-hermes config set GIGACHAT_CLIENT_SECRET ваш_client_secret
-
-# Или через переменные окружения
-export GIGACHAT_CLIENT_ID=ваш_client_id
-export GIGACHAT_CLIENT_SECRET=ваш_client_secret
+hermes chat
 ```
 
-- ✅ Автономно: плагин автоматически получает новый access token при каждом запросе
-- ✅ Client ID + Client Secret **не меняются** — выдаются один раз при создании приложения
-- 💡 Подходит для постоянной работы, не требует ручного обновления токена
+If setup is complete, Hermes will use GigaChat normally from the CLI.
 
-**Режим 2: Прямой API токен (опционально, для разовых сессий)**
+## Where to Run It
+
+### Linux / macOS / WSL2
+
+- Use a POSIX shell: `bash`, `zsh`, `fish`, etc.
+- In WSL2, use the Linux instructions inside WSL, not Windows PowerShell.
+- If Hermes runs in WSL2, configure the plugin inside the WSL2 Hermes profile.
+
+Example with environment variables:
 
 ```bash
-# Через Hermes CLI
-hermes config set GIGACHAT_API_TOKEN ваш_access_token
-
-# Или через переменные окружения
-export GIGACHAT_API_TOKEN=ваш_access_token
+export GIGACHAT_CLIENT_ID="your_client_id"
+export GIGACHAT_CLIENT_SECRET="your_client_secret"
 ```
 
-- ✅ Просто: скопируйте токен из кабинета разработчика
-- ⚠️ Access token действует **30 минут** — после истечения нужно получить новый вручную
-- 💡 Подходит для разовых сессий, тестирования
+### Windows native
 
-**Режим 3: Base64-encoded credentials (альтернатива)**
+- Use PowerShell.
+- Temporary environment variables:
+
+```powershell
+$env:GIGACHAT_CLIENT_ID="your_client_id"
+$env:GIGACHAT_CLIENT_SECRET="your_client_secret"
+```
+
+- If you are not using WSL2, follow the Windows instructions instead of POSIX `export` examples.
+
+## Configuration Options
+
+### Recommended: client credentials
 
 ```bash
-# Закодировать credentials: echo -n "client_id:client_secret" | base64
+hermes config set GIGACHAT_CLIENT_ID your_client_id
+hermes config set GIGACHAT_CLIENT_SECRET your_client_secret
+```
+
+Why this is preferred:
+
+- the access token refreshes automatically;
+- no manual 30-minute token refresh loop;
+- best for continuous use.
+
+### Alternative: direct access token
+
+```bash
+hermes config set GIGACHAT_API_TOKEN your_access_token
+```
+
+Good for one-off sessions and testing. Keep in mind that access tokens expire.
+
+### Alternative: base64 credentials
+
+```bash
 export GIGACHAT_API_TOKEN=base64(client_id:client_secret)
 ```
 
-- Эквивалентно режиму 1, но в одной переменной
-- Плагин автоматически распознаёт формат и запускает OAuth flow
+The plugin detects this format and performs the OAuth flow automatically.
 
-### 4. SSL-верификация
+### SSL verification
 
-GigaChat использует самоподписанные сертификаты. По умолчанию SSL-верификация отключена.
+GigaChat uses self-signed certificates, so SSL verification is off by default.
 
 ```bash
-# По умолчанию (SSL отключен)
-# Работает сразу после установки
-
-# Для production (требуется добавить CA в trust store)
 export GIGACHAT_SSL_VERIFY=true
 ```
 
-## Механизм ротации токенов
+Enable this only if the CA is already in your trust store.
 
-### Срок действия токена
+## What It Supports
 
-**Access token действует 30 минут** (согласно официальной документации).
+- Hermes chat through GigaChat;
+- model selection through `hermes model` and `/model`;
+- live model catalog loading from the API;
+- GigaChat-native `function calling`;
+- Hermes MCP tools;
+- CLI, TUI, gateway, and desktop scenarios through the shared backend.
 
-### Автоматическая ротация
+## Supported Models
 
-Плагин автоматически получает новый токен при каждом запросе к API:
+- `GigaChat`
+- `GigaChat-2`
+- `GigaChat-2-Max`
+- `GigaChat-2-Pro`
+- `GigaChat-Max`
+- `GigaChat-Plus`
+- `GigaChat-Pro`
 
-1. **При инициализации клиента**: `_get_gigachat_token()` вызывается для получения свежего токена
-2. **При 401 ошибке**: Hermes credential pool автоматически ротирует токен
-3. **Кэширование**: Токен не кэшируется намеренно — каждый запрос получает свежий токен
+## Technical Notes
 
-### Почему не кэшируем?
+### Tokens
 
-- Простота реализации
-- Избегаем edge cases с истёкшими токенами
-- OAuth-запрос быстрый (~200-500ms)
-- GigaChat не имеет rate limits на OAuth endpoint
+- Access tokens live for about 30 minutes.
+- The plugin fetches a fresh token for each request.
+- On `401`, Hermes can rotate credentials through the credential pool.
+- Tokens are not cached on purpose.
 
-### Схема работы
+### Function calling
 
-```
-Hermes Agent запрос
-    ↓
-_get_gigachat_token()
-    ↓
-POST https://ngw.devices.sberbank.ru:9443/api/v2/oauth
-    ↓
-Получение access_token (30 мин)
-    ↓
-Использование в API запросе
-    ↓
-GigaChat API ответ
-```
+GigaChat uses the native `functions` format, not OpenAI `tools`. That is why this plugin is more than "just another provider": it is the compatibility layer that translates Hermes/OpenAI-shaped requests and responses to GigaChat and back.
 
-## Поддерживаемые модели
+Format mapping:
 
-- `GigaChat` — базовая модель
-- `GigaChat-2` — второе поколение
-- `GigaChat-2-Max` — максимальная производительность
-- `GigaChat-2-Pro` — продвинутая версия
-- `GigaChat-Max` — флагманская модель
-- `GigaChat-Plus` — сбалансированная
-- `GigaChat-Pro` — профессиональная
-
-## Function Calling
-
-GigaChat использует **нативный `functions` формат**, а не OpenAI `tools`.
-
-### Преобразование форматов
-
-Плагин автоматически преобразует:
-
-| Hermes (OpenAI) | GigaChat (Native) |
-|-----------------|-------------------|
+| Hermes | GigaChat |
+|---|---|
 | `tools[]` | `functions[]` |
 | `tool_calls[]` | `function_call` |
-| `tool.role: "tool"` | `function.role: "function"` |
+| `tool.role="tool"` | `function.role="function"` |
 
-### Пример function call
+### API endpoints
 
-```json
-{
-  "model": "GigaChat-Max",
-  "messages": [{"role": "user", "content": "Погода в Москве"}],
-  "functions": [{
-    "name": "get_weather",
-    "description": "Получить погоду",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "location": {"type": "string"}
-      },
-      "required": ["location"]
-    }
-  }]
-}
-```
+| Endpoint | Purpose |
+|---|---|
+| `https://ngw.devices.sberbank.ru:9443/api/v2/oauth` | OAuth token |
+| `https://gigachat.devices.sberbank.ru/api/v1/models` | Model list |
+| `https://gigachat.devices.sberbank.ru/api/v1/chat/completions` | Chat API |
+| `https://gigachat.devices.sberbank.ru/api/v1/embeddings` | Embeddings |
 
-## Готовность к релизу
+### Environment variables
 
-Плагин готов к релизу для проверенных сценариев Hermes Agent:
+| Variable | Purpose | Default |
+|---|---|---|
+| `GIGACHAT_API_TOKEN` | Direct token or base64 credentials | - |
+| `GIGACHAT_CLIENT_ID` | Client ID from the portal | - |
+| `GIGACHAT_CLIENT_SECRET` | Client secret | - |
+| `GIGACHAT_SSL_VERIFY` | Enable SSL verification | `false` |
+| `GIGACHAT_BASE_URL` | Custom base URL | `https://gigachat.devices.sberbank.ru/api/v1` |
 
-- аутентификация через `Client ID` / `Client Secret`
-- выбор модели из `hermes model` и `/model`
-- загрузка актуального списка моделей из API, без захардкоженного каталога
-- `function calling` для обычных инструментов Hermes
-- работа с MCP-инструментами через Hermes (`mcp_time_get_current_time`, `mcp_time_convert_time`)
+## Validation
 
-### Выполненные проверки
+Release-relevant Hermes scenarios were verified:
 
-| Проверка | Результат |
-|----------|-----------|
+| Check | Result |
+|---|---|
 | `python -m pytest tests\\hermes_cli\\test_gigachat_model_flow.py -q -p no:timeout -p no:cacheprovider -o addopts=""` | `8/8 passed` |
-| `hermes mcp test time` | `1/1 passed` (`✓ Connected`, `2` инструмента обнаружены) |
+| `hermes mcp test time` | `1/1 passed` |
 | `python -m py_compile hermes_cli\\mcp_startup.py` | `1/1 passed` |
 | `python -m pytest tests\\cron\\test_cron_profile.py -q -p no:timeout -p no:cacheprovider -o addopts=""` | `20/20 passed` |
 | `python -m pytest tests\\cron\\test_cron_script.py -q -p no:timeout -p no:cacheprovider -o addopts=""` | `35 passed, 1 skipped` |
-| provider-regress (все model providers, Windows) | `1359/1359 passed`, `0 failed`, `48` файлов, `111.0s` |
+| provider-regression (all model providers, Windows) | `1359/1359 passed`, `0 failed` |
 
-### Проверка cron режима (2026-06-07)
+What this confirms:
 
-Проверка cron-режима выполнена на Windows через Python-совместимые cron-тесты:
-
-- `tests\\cron\\test_cron_profile.py` — `20/20 passed`
-- `tests\\cron\\test_cron_script.py` — `35 passed, 1 skipped`
-
-Эти прогоны подтвердили cron-runtime контекст, изоляцию профилей, последовательное выполнение profile jobs и работу script injection / containment без зависимости от bash-скриптов.
-
-### Полный регресс по всем провайдерам моделей (2026-06-07)
-
-Запускался расширенный provider-regression по всем model provider тестам, не только по GigaChat.
-После исправлений ниже прогон завершился без падений.
-
-**Команда**
-
-```bash
-python scripts/run_tests_parallel.py \
-  tests/providers \
-  tests/plugins/model_providers \
-  tests/run_agent/test_provider_parity.py \
-  tests/run_agent/test_provider_fallback.py \
-  tests/run_agent/test_provider_attribution_headers.py \
-  tests/gateway/test_model_command_custom_providers.py \
-  tests/tui_gateway/test_make_agent_provider.py \
-  tests/cli/test_cli_provider_resolution.py \
-  tests/agent/test_direct_provider_url_detection.py \
-  tests/agent/test_custom_provider_extra_body.py \
-  tests/agent/test_minimax_provider.py \
-  tests/agent/test_gigachat_streaming_policy.py \
-  tests/agent/test_set_runtime_main_custom_provider.py \
-  tests/agent/transports/test_chat_completions.py \
-  tests/agent/transports/test_gigachat_chat_completions.py \
-  tests/hermes_cli/test_anthropic_provider_persistence.py \
-  tests/hermes_cli/test_api_key_providers.py \
-  tests/hermes_cli/test_arcee_provider.py \
-  tests/hermes_cli/test_auth_codex_provider.py \
-  tests/hermes_cli/test_auth_nous_provider.py \
-  tests/hermes_cli/test_auth_provider_gate.py \
-  tests/hermes_cli/test_auth_qwen_provider.py \
-  tests/hermes_cli/test_auth_xai_oauth_provider.py \
-  tests/hermes_cli/test_custom_provider_context_length.py \
-  tests/hermes_cli/test_custom_provider_model_switch.py \
-  tests/hermes_cli/test_gemini_provider.py \
-  tests/hermes_cli/test_gigachat_model_flow.py \
-  tests/hermes_cli/test_gmi_provider.py \
-  tests/hermes_cli/test_list_picker_providers.py \
-  tests/hermes_cli/test_model_provider_persistence.py \
-  tests/hermes_cli/test_model_switch_custom_providers.py \
-  tests/hermes_cli/test_ollama_cloud_provider.py \
-  tests/hermes_cli/test_provider_config_validation.py \
-  tests/hermes_cli/test_provider_groups.py \
-  tests/hermes_cli/test_runtime_provider_resolution.py \
-  tests/hermes_cli/test_setup_model_provider.py \
-  tests/hermes_cli/test_status_model_provider.py \
-  tests/hermes_cli/test_tencent_tokenhub_provider.py \
-  tests/hermes_cli/test_user_providers_model_switch.py \
-  tests/hermes_cli/test_xai_provider_labels.py \
-  tests/hermes_cli/test_xiaomi_provider.py \
-  -- --timeout-method=thread
-```
-
-**Итог**
-
-- `48` test files
-- `1359` tests total
-- `1359` passed
-- `0` failed
-
-**Что прошло**
-
-- `tests/providers/*` для GigaChat, DeepSeek, MiniMax, OpenCode Go и общего provider wiring
-- transport-покрытие для chat completions, включая `tests/agent/transports/test_gigachat_chat_completions.py`
-- крупные CLI-наборы по API-key / OAuth провайдерам, включая `test_api_key_providers.py`, `test_auth_xai_oauth_provider.py`, `test_tencent_tokenhub_provider.py`, `test_ollama_cloud_provider.py`, `test_xiaomi_provider.py`
-- GigaChat-specific flow остался зелёным: `tests/hermes_cli/test_gigachat_model_flow.py` → `8/8 passed`
-
-**Что изменили**
-
-- `agent/auxiliary_client.py` — убрали `UnboundLocalError` в `resolve_provider_client()`
-- `hermes_cli/runtime_provider.py` — исправили `qwen-oauth` fallback и pool resolution
-- `hermes_cli/providers.py` — вернули корректную метку `xAI`
-- `hermes_cli/auth.py` — стабилизировали сохранение Qwen/Nous state на Windows
-- `hermes_logging.py` — убрали падения на недоступных лог-директориях в тестах
-- `tests/run_agent/test_provider_parity.py` — отключили живой localhost-probe в parity helper
-
-### Что ещё не покрыто полностью
-
-- все MCP-серверы, кроме `time`
-- TUI, desktop и gateway
-- медленные или падающие MCP-серверы
-- новые provider-regression сценарии сверх уже зелёного набора требуют отдельного прогона и фиксации результата
-
-## API Endpoints
-
-| Endpoint | Назначение | SSL |
-|----------|------------|-----|
-| `https://ngw.devices.sberbank.ru:9443/api/v2/oauth` | OAuth токен | Self-signed |
-| `https://gigachat.devices.sberbank.ru/api/v1/models` | Список моделей | Self-signed |
-| `https://gigachat.devices.sberbank.ru/api/v1/chat/completions` | Chat API | Self-signed |
-| `https://gigachat.devices.sberbank.ru/api/v1/embeddings` | Embeddings | Self-signed |
-
-## Переменные окружения
-
-| Переменная | Описание | По умолчанию |
-|------------|----------|--------------|
-| `GIGACHAT_API_TOKEN` | Pre-computed токен (base64) | - |
-| `GIGACHAT_CLIENT_ID` | Client ID из кабинета | - |
-| `GIGACHAT_CLIENT_SECRET` | Client Secret | - |
-| `GIGACHAT_SSL_VERIFY` | Включить SSL-верификацию | `false` |
-| `GIGACHAT_BASE_URL` | Кастомный base URL | `https://gigachat.devices.sberbank.ru/api/v1` |
+- the GigaChat-specific flow stays green;
+- `function calling` and model selection work against the live catalog;
+- cron mode and script injection have separate coverage;
+- the wider provider regression remains green on Windows.
 
 ## Troubleshooting
 
 ### 401 Unauthorized
 
-- Проверьте правильность `CLIENT_ID` и `CLIENT_SECRET`
-- Убедитесь, что приложение активно в личном кабинете
-- Проверьте квоты и лимиты
+- Check `Client ID` and `Client Secret`.
+- Make sure the application is active in the portal.
+- Verify quotas and permissions.
 
 ### Connection error
 
-- SSL-сертификаты: установите `GIGACHAT_SSL_VERIFY=false`
-- Проверьте доступность endpoints из вашей сети
-- Возможно нужен прокси
+- For local testing, keep `GIGACHAT_SSL_VERIFY=false`.
+- For production, add the CA to your trust store and enable SSL verification.
 
-### Function calling не работает
+### Function calling does not work
 
-- Убедитесь, что модель поддерживает functions (Max, Pro)
-- Используйте правильный формат `functions` (не `tools`)
-- Проверьте `finish_reason: "function_call"` в ответе
+- Make sure the selected model supports `functions`.
+- Use Hermes `tools` examples, not OpenAI-only snippets.
+- Check that the response ends with `finish_reason: "function_call"`.
 
-## Ссылки
+## Links
 
 - [GigaChat API Docs](https://developers.sber.ru/docs/ru/gigachat)
-- [ai-forever/gigachat](https://github.com/ai-forever/gigachat) — Python SDK
 - [Hermes Agent Docs](https://hermes-agent.nousresearch.com/docs)
+- [ai-forever/gigachat](https://github.com/ai-forever/gigachat) — Python SDK
 
-## Лицензия
+## Open Questions
+
+- The full set of MCP servers, except `time`, has not been validated here.
+- TUI, desktop, and gateway are covered at the level of shared Hermes backend compatibility, but not by a separate GigaChat-specific regression.
+- Any new provider-regression scenario beyond the already green set requires a separate run and result capture.
+
+## License
 
 MIT

@@ -26,7 +26,7 @@ cd hermes-gigachat_api
 # 2. Checkout the gigachat-plugin branch
 git checkout gigachat-plugin
 
-# 3. Install uv (Python package manager)
+# 3. Install uv (Python package manager), or don't if already done it before!
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 # 4. Create virtual environment
@@ -35,10 +35,13 @@ uv venv .venv --python 3.11
 # 5. Activate the environment
 .\.venv\Scripts\Activate.ps1
 
-# 6. Install the project in development mode
-uv pip install -e ".[all]"
+# 6. Bootstrap pip if the venv was created without it
+.\.venv\Scripts\python.exe -m ensurepip --upgrade
 
-# 7. Verify installation
+# 7. Install the project in development mode
+.\.venv\Scripts\python.exe -m pip install -e .
+
+# 8. Verify installation
 hermes version
 ```
 
@@ -69,7 +72,7 @@ hermes model
 .\.venv\Scripts\Activate.ps1
 
 # Install pytest
-uv pip install pytest pytest-xdist
+.\.venv\Scripts\python.exe -m pip install pytest pytest-xdist
 
 # Run tests (single-threaded on Windows)
 pytest tests/ -v -n 0
@@ -144,6 +147,15 @@ python3 -c "from hermes_cli.models import _PROVIDER_MODELS; print('Curated:', _P
 ## Debugging
 
 If the model list doesn't load:
+
+### If `.venv` has no `pip`
+
+Some Windows venvs are created without bundled `pip`. Bootstrap it once:
+
+```powershell
+.\.venv\Scripts\python.exe -m ensurepip --upgrade
+.\.venv\Scripts\python.exe -m pip install -e .
+```
 
 ### Enable verbose logging
 

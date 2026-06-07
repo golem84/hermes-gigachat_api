@@ -60,6 +60,8 @@ def _make_agent(monkeypatch, provider, api_mode="chat_completions", base_url="ht
     monkeypatch.setattr("run_agent.get_tool_definitions", lambda **kw: _tool_defs("web_search", "terminal"))
     monkeypatch.setattr("run_agent.check_toolset_requirements", lambda: {})
     monkeypatch.setattr("run_agent.OpenAI", _FakeOpenAI)
+    monkeypatch.setattr("agent.model_metadata.get_model_context_length", lambda *a, **k: 131072)
+    monkeypatch.setattr("agent.context_compressor.get_model_context_length", lambda *a, **k: 131072)
     kwargs = dict(
         api_key="test-key",
         base_url=base_url,
@@ -74,9 +76,6 @@ def _make_agent(monkeypatch, provider, api_mode="chat_completions", base_url="ht
         kwargs["model"] = model
     elif provider == "nous":
         kwargs["model"] = "gpt-5"
-    base_url="https://openrouter.ai/api/v1",
-    api_key="test-key",
-    base_url="https://openrouter.ai/api/v1",
     return AIAgent(**kwargs)
 
 

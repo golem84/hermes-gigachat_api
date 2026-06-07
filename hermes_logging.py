@@ -29,6 +29,7 @@ Session context:
 
 import logging
 import os
+import tempfile
 import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -207,9 +208,19 @@ def setup_logging(
         The ``logs/`` directory where files are written.
     """
     global _logging_initialized
-    home = hermes_home or get_hermes_home()
+    if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("PYTEST_VERSION"):
+        home = Path(tempfile.gettempdir()) / "hermes" / "pytest"
+    else:
+        home = hermes_home or get_hermes_home()
     log_dir = home / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        if not os.access(log_dir, os.W_OK | os.X_OK):
+            raise PermissionError(str(log_dir))
+    except OSError:
+        fallback_home = Path(tempfile.gettempdir()) / "hermes"
+        log_dir = fallback_home / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
 
     # Read config defaults (best-effort — config may not be loaded yet).
     cfg_level, cfg_max_size, cfg_backup = _read_logging_config()

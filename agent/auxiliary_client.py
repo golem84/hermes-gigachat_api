@@ -3901,8 +3901,8 @@ def resolve_provider_client(
                 api_key = creds.get("api_key", "")
                 base_url = creds.get("base_url", "").rstrip("/")
                 if api_key and base_url:
-                    from openai import OpenAI
-                    client = OpenAI(
+                    from openai import OpenAI as _OpenAI
+                    client = _OpenAI(
                         api_key=api_key,
                         base_url=base_url,
                     )

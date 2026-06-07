@@ -1956,6 +1956,10 @@ def _save_qwen_cli_tokens(tokens: Dict[str, Any]) -> Path:
             fh.flush()
             os.fsync(fh.fileno())
         atomic_replace(tmp_path, auth_path)
+        try:
+            auth_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        except OSError:
+            pass
     finally:
         try:
             if tmp_path.exists():
@@ -4500,6 +4504,10 @@ def _write_shared_nous_state(state: Dict[str, Any]) -> None:
                     fh.flush()
                     os.fsync(fh.fileno())
                 os.replace(tmp, path)
+                try:
+                    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+                except OSError:
+                    pass
             finally:
                 try:
                     if tmp.exists():

@@ -1309,7 +1309,7 @@ def resolve_runtime_provider(
     if explicit_runtime:
         return explicit_runtime
 
-    should_use_pool = provider != "openrouter"
+    should_use_pool = provider not in {"openrouter", "qwen-oauth"}
     if provider == "openrouter":
         cfg_provider = str(model_cfg.get("provider") or "").strip().lower()
         cfg_base_url = str(model_cfg.get("base_url") or "").strip()
@@ -1456,11 +1456,33 @@ def resolve_runtime_provider(
                 "expires_at_ms": creds.get("expires_at_ms"),
                 "requested_provider": requested_provider,
             }
-        except AuthError:
+        except AuthError as exc:
+            if requested_provider != "auto":
+                try:
+                    pool = load_pool(provider)
+                except Exception:
+                    pool = None
+                if pool and pool.has_credentials():
+                    entry = pool.select()
+                    if entry is not None:
+                        pool_api_key = (
+                            getattr(entry, "runtime_api_key", None)
+                            or getattr(entry, "access_token", "")
+                        )
+                        if pool_api_key:
+                            return _resolve_runtime_from_pool_entry(
+                                provider=provider,
+                                entry=entry,
+                                requested_provider=requested_provider,
+                                model_cfg=model_cfg,
+                                pool=pool,
+                                target_model=target_model,
+                            )
             if requested_provider != "auto":
                 raise
-            logger.info("Qwen OAuth credentials failed; "
-                        "falling through to next provider.")
+            logger.info(
+                "Qwen OAuth credentials failed; falling through to next provider."
+            )
 
     if provider == "minimax-oauth":
         pconfig = PROVIDER_REGISTRY.get(provider)

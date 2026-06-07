@@ -202,13 +202,98 @@ GigaChat использует **нативный `functions` формат**, а 
 | `python -m pytest tests\\hermes_cli\\test_gigachat_model_flow.py -q -p no:timeout -p no:cacheprovider -o addopts=""` | `8/8 passed` |
 | `hermes mcp test time` | `1/1 passed` (`✓ Connected`, `2` инструмента обнаружены) |
 | `python -m py_compile hermes_cli\\mcp_startup.py` | `1/1 passed` |
+| provider-regress (все model providers, Windows) | `1240/1359 passed`, `119 failed`, `48` файлов, `107.2s` |
+
+### Полный регресс по всем провайдерам моделей (2026-06-07)
+
+Запускался расширенный provider-regression по всем model provider тестам, не только по GigaChat.
+
+**Команда**
+
+```bash
+python scripts/run_tests_parallel.py \
+  tests/providers \
+  tests/plugins/model_providers \
+  tests/run_agent/test_provider_parity.py \
+  tests/run_agent/test_provider_fallback.py \
+  tests/run_agent/test_provider_attribution_headers.py \
+  tests/gateway/test_model_command_custom_providers.py \
+  tests/tui_gateway/test_make_agent_provider.py \
+  tests/cli/test_cli_provider_resolution.py \
+  tests/agent/test_direct_provider_url_detection.py \
+  tests/agent/test_custom_provider_extra_body.py \
+  tests/agent/test_minimax_provider.py \
+  tests/agent/test_gigachat_streaming_policy.py \
+  tests/agent/test_set_runtime_main_custom_provider.py \
+  tests/agent/transports/test_chat_completions.py \
+  tests/agent/transports/test_gigachat_chat_completions.py \
+  tests/hermes_cli/test_anthropic_provider_persistence.py \
+  tests/hermes_cli/test_api_key_providers.py \
+  tests/hermes_cli/test_arcee_provider.py \
+  tests/hermes_cli/test_auth_codex_provider.py \
+  tests/hermes_cli/test_auth_nous_provider.py \
+  tests/hermes_cli/test_auth_provider_gate.py \
+  tests/hermes_cli/test_auth_qwen_provider.py \
+  tests/hermes_cli/test_auth_xai_oauth_provider.py \
+  tests/hermes_cli/test_custom_provider_context_length.py \
+  tests/hermes_cli/test_custom_provider_model_switch.py \
+  tests/hermes_cli/test_gemini_provider.py \
+  tests/hermes_cli/test_gigachat_model_flow.py \
+  tests/hermes_cli/test_gmi_provider.py \
+  tests/hermes_cli/test_list_picker_providers.py \
+  tests/hermes_cli/test_model_provider_persistence.py \
+  tests/hermes_cli/test_model_switch_custom_providers.py \
+  tests/hermes_cli/test_ollama_cloud_provider.py \
+  tests/hermes_cli/test_provider_config_validation.py \
+  tests/hermes_cli/test_provider_groups.py \
+  tests/hermes_cli/test_runtime_provider_resolution.py \
+  tests/hermes_cli/test_setup_model_provider.py \
+  tests/hermes_cli/test_status_model_provider.py \
+  tests/hermes_cli/test_tencent_tokenhub_provider.py \
+  tests/hermes_cli/test_user_providers_model_switch.py \
+  tests/hermes_cli/test_xai_provider_labels.py \
+  tests/hermes_cli/test_xiaomi_provider.py \
+  -- --timeout-method=thread
+```
+
+**Итог**
+
+- `48` test files
+- `1359` tests total
+- `1240` passed
+- `119` failed
+- raw log: `temp/provider-regression-20260607.txt`
+
+**Что прошло**
+
+- `tests/providers/*` для GigaChat, DeepSeek, MiniMax, OpenCode Go и общего provider wiring
+- transport-покрытие для chat completions, включая `tests/agent/transports/test_gigachat_chat_completions.py`
+- крупные CLI-наборы по API-key / OAuth провайдерам, включая `test_api_key_providers.py`, `test_auth_xai_oauth_provider.py`, `test_tencent_tokenhub_provider.py`, `test_ollama_cloud_provider.py`, `test_xiaomi_provider.py`
+- GigaChat-specific flow остался зелёным: `tests/hermes_cli/test_gigachat_model_flow.py` → `8/8 passed`
+
+**Что упало**
+
+- `agent/auxiliary_client.py` — `UnboundLocalError` по локальной переменной `OpenAI`
+  - затронуты `tests/agent/test_set_runtime_main_custom_provider.py`
+  - затронуты `tests/hermes_cli/test_gmi_provider.py`
+  - затронуты `tests/hermes_cli/test_gemini_provider.py`
+- provider resolution / labels
+  - `tests/hermes_cli/test_runtime_provider_resolution.py` (`2` failures, `qwen-oauth`)
+  - `tests/hermes_cli/test_xai_provider_labels.py` (`xai` vs `xAI`)
+- файловые permissions на Windows
+  - `tests/hermes_cli/test_auth_qwen_provider.py` (`1` failure)
+  - `tests/hermes_cli/test_auth_nous_provider.py` (`1` failure)
+- `run_agent` provider suites блокируются на `PermissionError` при открытии `C:\Users\andr0\AppData\Local\hermes\logs\agent.log`
+  - `tests/run_agent/test_provider_attribution_headers.py` (`9` failures)
+  - `tests/run_agent/test_provider_fallback.py` (`16` failures)
+  - `tests/run_agent/test_provider_parity.py` (`84` failures)
 
 ### Что ещё не покрыто полностью
 
 - все MCP-серверы, кроме `time`
 - TUI, desktop, gateway и cron-режимы
 - медленные или падающие MCP-серверы
-- полный регресс по всем провайдерам моделей, не только GigaChat
+- разбор и исправление оставшихся `119` падений из полного provider-regression
 
 ## API Endpoints
 

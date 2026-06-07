@@ -274,7 +274,6 @@ python scripts/run_tests_parallel.py \
 - `1359` tests total
 - `1359` passed
 - `0` failed
-- raw log: `temp/provider-regression-20260607-green.txt`
 
 **Что прошло**
 
@@ -297,7 +296,7 @@ python scripts/run_tests_parallel.py \
 - все MCP-серверы, кроме `time`
 - TUI, desktop и gateway
 - медленные или падающие MCP-серверы
-- дальнейшее расширение provider-regression за рамки уже зелёного набора
+- новые provider-regression сценарии сверх уже зелёного набора требуют отдельного прогона и фиксации результата
 
 ## API Endpoints
 

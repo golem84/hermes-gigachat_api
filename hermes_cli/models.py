@@ -2113,6 +2113,20 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
             pass
         if normalized == "copilot-acp":
             return list(_PROVIDER_MODELS.get("copilot", []))
+    if normalized == "gigachat":
+        try:
+            from hermes_cli.auth import resolve_gigachat_runtime_credentials
+            from providers import get_provider_profile
+
+            creds = resolve_gigachat_runtime_credentials()
+            api_key = str(creds.get("api_key") or "").strip()
+            profile = get_provider_profile("gigachat")
+            if profile and api_key:
+                live = profile.fetch_models(api_key=api_key, timeout=8.0)
+                if live:
+                    return live
+        except Exception:
+            pass
     if normalized == "nous":
         # Try live Nous Portal /models endpoint
         try:
@@ -2302,6 +2316,11 @@ def _credential_fingerprint(provider: str) -> str:
     import os as _os
 
     parts: list[str] = []
+
+    # Catalog-shape salt: bump when a provider's live model filter changes
+    # so stale on-disk picker caches do not preserve an old catalog shape.
+    if provider == "gigachat":
+        parts.append("gigachat-model-catalog=v2")
 
     # Env vars from PROVIDER_REGISTRY for this slug
     try:

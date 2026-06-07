@@ -152,11 +152,17 @@ def test_gigachat_model_flow_fetches_live_models(monkeypatch):
         "gigachat",
         ["wrong-static-model"],
     )
+    monkeypatch.setattr(
+        "hermes_cli.auth.resolve_gigachat_runtime_credentials",
+        lambda: {
+            "api_key": "access-token",
+            "base_url": "https://gigachat.devices.sberbank.ru/api/v1",
+        },
+    )
     monkeypatch.setattr(profile, "fetch_models", lambda *, api_key=None, timeout=8.0: [
         "GigaChat-Max",
         "GigaChat-Pro",
         "GigaChat-Lite",
-        "Embeddings",
     ])
 
     def fake_prompt_model_selection(model_ids, current_model="", **kwargs):
@@ -172,5 +178,94 @@ def test_gigachat_model_flow_fetches_live_models(monkeypatch):
         "GigaChat-Max",
         "GigaChat-Pro",
         "GigaChat-Lite",
-        "Embeddings",
+    ]
+
+
+def test_gigachat_fetch_models_filters_non_chat_entries(monkeypatch):
+    import importlib
+
+    from providers import get_provider_profile
+
+    profile = get_provider_profile("gigachat")
+    gigachat_mod = importlib.import_module("plugins.model_providers.gigachat")
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "data": [
+                        {
+                            "id": "GigaChat-Max",
+                            "model_picker_enabled": True,
+                            "capabilities": {"type": "chat"},
+                        },
+                        {
+                            "id": "GigaChat-Pro",
+                            "model_picker_enabled": True,
+                            "capabilities": {"type": "chat"},
+                        },
+                        {
+                            "id": "GigaChat-Lite",
+                            "model_picker_enabled": True,
+                            "capabilities": {"type": "chat"},
+                        },
+                        {
+                            "id": "Embeddings",
+                            "model_picker_enabled": True,
+                            "capabilities": {"type": "embedding"},
+                        },
+                        {
+                            "id": "GigaChat-Max-preview",
+                            "model_picker_enabled": False,
+                            "capabilities": {"type": "chat"},
+                        },
+                    ]
+                }
+            ).encode()
+
+    monkeypatch.setattr(gigachat_mod.urllib.request, "urlopen", lambda *args, **kwargs: _Resp())
+
+    models = profile.fetch_models(api_key="access-token", timeout=8.0)
+
+    assert models == [
+        "GigaChat-Max",
+        "GigaChat-Pro",
+        "GigaChat-Lite",
+    ]
+
+
+def test_gigachat_provider_model_ids_use_live_catalog(monkeypatch):
+    from providers import get_provider_profile
+    from hermes_cli.models import provider_model_ids
+    import hermes_cli.models as models_mod
+
+    profile = get_provider_profile("gigachat")
+    monkeypatch.setitem(
+        models_mod._PROVIDER_MODELS,
+        "gigachat",
+        ["wrong-static-model"],
+    )
+    monkeypatch.setattr(
+        "hermes_cli.auth.resolve_gigachat_runtime_credentials",
+        lambda: {
+            "api_key": "access-token",
+            "base_url": "https://gigachat.devices.sberbank.ru/api/v1",
+        },
+    )
+    monkeypatch.setattr(profile, "fetch_models", lambda *, api_key=None, timeout=8.0: [
+        "GigaChat-Max",
+        "GigaChat-Pro",
+        "GigaChat-Lite",
+    ])
+
+    assert provider_model_ids("gigachat", force_refresh=True) == [
+        "GigaChat-Max",
+        "GigaChat-Pro",
+        "GigaChat-Lite",
     ]
